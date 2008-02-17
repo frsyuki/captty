@@ -6,7 +6,7 @@ all: partty-server partty-host partty-gate
 %.o: %.cc
 	$(CXX) -c $< $(CFLAGS)
 
-partty-server: server.o emtelnet.o cmd_server.o
+partty-server: server.o emtelnet.o multiplexer.o cmd_server.o
 	$(CXX) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
 partty-host: cmd_host.o host.o ptyshell.o
@@ -22,5 +22,9 @@ clean:
 	$(RM) emtelnet.o ptyshell.o
 	$(RM) server.o host.o gate.o
 	$(RM) cmd_host.o cmd_server.o cmd_gate.o
+
+
+depend:
+	makedepend *.cc
 
 

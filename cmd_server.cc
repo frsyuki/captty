@@ -5,19 +5,15 @@
 #include <string.h>
 #include <string>
 #include <limits.h>
+#include <signal.h>
 
 int main(int argc, char* argv[])
 {
-	// FIXME GATE_DIR
-	//const char* session = "test";
-
 	struct sockaddr_storage saddr;
-	std::string session;
 	{
 		using namespace Kazuhiki;
 		Parser kz;
 		kz.on("-l", "", Accept::FlexibleListtenAddress(saddr, 2755));
-		kz.on("-s", "", Accept::String(session));
 		--argc;
 		++argv;
 		kz.break_order(argc, argv);
@@ -32,6 +28,7 @@ int main(int argc, char* argv[])
 		pexit("bind"); }
 	if( listen(ssock, 5) < 0 ) { pexit("listen"); }
 
+	/*
 	char gate_path[PATH_MAX + Partty::MAX_SESSION_NAME_LENGTH];
 	ssize_t gate_dir_len = strlen(Partty::GATE_DIR);
 	memcpy(gate_path, Partty::GATE_DIR, gate_dir_len);
@@ -47,6 +44,20 @@ int main(int argc, char* argv[])
 			host, gate,
 			session.c_str(), session.length(),
 			"", 0);
+	return server.run();
+	*/
+
+	{
+		// SIGCHLD
+		struct sigaction act_child;
+		act_child.sa_handler = SIG_IGN;
+		sigemptyset(&act_child.sa_mask);
+		act_child.sa_flags = SA_NOCLDSTOP | SA_RESTART;
+		sigaction(SIGCHLD, &act_child, NULL);
+	}
+
+	Partty::Server server(ssock);
+
 	return server.run();
 
 	// FIXME unlink

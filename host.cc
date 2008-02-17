@@ -19,12 +19,19 @@ namespace Partty {
 
 class HostIMPL {
 public:
-	HostIMPL(int server_socket);
+	HostIMPL(int server_socket,
+		const char* session_name, size_t session_name_length,
+		const char* password, size_t password_length);
 	int run(void);
 private:
 	int sh;
 	int host;
 	int server;
+
+	char m_session_name[MAX_SESSION_NAME_LENGTH];
+	char m_password[MAX_PASSWORD_LENGTH];
+	size_t m_session_name_length;
+	size_t m_password_length;
 private:
 	HostIMPL();
 	HostIMPL(const HostIMPL&);
@@ -33,7 +40,6 @@ private:
 	int io_server(int fd, short event);
 	int io_shell(int fd, short event);
 private:
-	typedef mp::event<void> mpevent;
 	typedef mp::dispatch<void> mpdispatch;
 	mpdispatch mpdp;
 	static const size_t SHARED_BUFFER_SIZE = 32 * 1024;
@@ -47,14 +53,47 @@ private:
 };
 
 
-Host::Host(int server_socket) : impl(new HostIMPL(server_socket)) {}
+Host::Host(int server_socket,
+	const char* session_name, size_t session_name_length,
+	const char* password, size_t password_length ) :
+		impl(new HostIMPL(server_socket,
+			session_name, session_name_length,
+			password, password_length )) {}
 Host::~Host() { delete impl; }
 
-HostIMPL::HostIMPL(int server_socket) : server(server_socket) {}
+HostIMPL::HostIMPL(int server_socket,
+	const char* session_name, size_t session_name_length,
+	const char* password, size_t password_length ) :
+		server(server_socket),
+		m_session_name_length(session_name_length),
+		m_password_length(password_length)
+{
+	// FIXME MAX_SESSION_NAME_LENGTH > session_name_length
+	// FIXME MAX_PASSWORD_LENGTH > password_length
+
+	std::memcpy(m_session_name, session_name, m_session_name_length);
+	std::memcpy(m_password, password, m_password_length);
+}
 
 int Host::run(void) { return impl->run(); }
 int HostIMPL::run(void)
 {
+	negotiation_header_t header;
+	memcpy(header.magic, NEGOTIATION_MAGIC_STRING, NEGOTIATION_MAGIC_STRING_LENGTH);
+	// headerにはネットワークバイトオーダーで入れる
+	header.user_name_length    = htons(0);
+	header.session_name_length = htons(m_session_name_length);
+	header.password_length     = htons(m_password_length);
+	if( write_all(server, (char*)&header, sizeof(header)) != sizeof(header) ) {
+		pexit("write header");
+	}
+	if( write_all(server, m_session_name, m_session_name_length) != m_session_name_length ) {
+		pexit("write session");
+	}
+	if( write_all(server, m_password, m_password_length) != m_password_length ) {
+		pexit("write password");
+	}
+
 	ptyshell psh(STDIN);
 	if( psh.fork(NULL) < 0 ) { pexit("psh.fork"); }
 	sh = psh.masterfd();

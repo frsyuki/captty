@@ -103,12 +103,12 @@ void filt_telnetd::get_obuffer(buffer_t* out) {
 
 
 
-class ServerIMPL {
+class MultiplexerIMPL {
 public:
-	ServerIMPL( int host_socket, int gate_socket,
-		    const char* session_name, size_t session_name_length,
-		    const char* password, size_t password_length );
-	~ServerIMPL();
+	MultiplexerIMPL(int host_socket, int gate_socket,
+		const char* session_name, size_t session_name_length,
+		const char* password, size_t password_length);
+	~MultiplexerIMPL();
 	int run(void);
 private:
 	int host;
@@ -138,22 +138,22 @@ private:
 	void remove_guest(int fd);
 	void remove_guest(int fd, filt_telnetd& srv);
 private:
-	ServerIMPL();
-	ServerIMPL(const ServerIMPL&);
+	MultiplexerIMPL();
+	MultiplexerIMPL(const MultiplexerIMPL&);
 };
 
 
 
-Server::Server(	int host_socket, int gate_socket,
-		const char* session_name, size_t session_name_length,
-		const char* password, size_t password_length ) :
-	impl(new ServerIMPL( host_socket, gate_socket,
+Multiplexer::Multiplexer(int host_socket, int gate_socket,
+	const char* session_name, size_t session_name_length,
+	const char* password, size_t password_length) :
+		impl(new MultiplexerIMPL( host_socket, gate_socket,
 			     session_name, session_name_length,
 			     password, password_length )) {}
-Server::~Server() { delete impl; }
+Multiplexer::~Multiplexer() { delete impl; }
 
 
-ServerIMPL::ServerIMPL(int host_socket, int gate_socket,
+MultiplexerIMPL::MultiplexerIMPL(int host_socket, int gate_socket,
 	   const char* session_name, size_t session_name_length,
 	   const char* password, size_t password_length ) :
 		host(host_socket), gate(gate_socket),
@@ -173,7 +173,7 @@ ServerIMPL::ServerIMPL(int host_socket, int gate_socket,
 	if( mpev.add(gate, mp::EV_READ) < 0 ) { pexit("mpev.add gate"); }
 }
 
-ServerIMPL::~ServerIMPL()
+MultiplexerIMPL::~MultiplexerIMPL()
 {
 	if( num_guest > 0 ) {
 		int n = 0;
@@ -189,8 +189,8 @@ ServerIMPL::~ServerIMPL()
 }
 
 
-int Server::run(void) { return impl->run(); }
-int ServerIMPL::run(void)
+int Multiplexer::run(void) { return impl->run(); }
+int MultiplexerIMPL::run(void)
 {
 	int fd;
 	short event;
@@ -208,11 +208,10 @@ int ServerIMPL::run(void)
 			return -1;
 		}
 	}
-
 	return 0;
 }
 
-int ServerIMPL::io_host(int fd, short event)
+int MultiplexerIMPL::io_host(int fd, short event)
 {
 	ssize_t len = read(fd, shared_buffer, SHARED_BUFFER_SIZE);
 	if( len < 0 ) {
@@ -240,7 +239,7 @@ int ServerIMPL::io_host(int fd, short event)
 	return 0;
 }
 
-int ServerIMPL::io_gate(int fd, short event)
+int MultiplexerIMPL::io_gate(int fd, short event)
 {
 	gate_message_t msg;
 	int guest = recvfd(gate, &msg, sizeof(msg));
@@ -273,7 +272,7 @@ int ServerIMPL::io_gate(int fd, short event)
 	return 0;
 }
 
-int ServerIMPL::io_guest(int fd, short event)
+int MultiplexerIMPL::io_guest(int fd, short event)
 {
 	if( event & mp::EV_READ ) {
 		ssize_t len = read(fd, shared_buffer, SHARED_BUFFER_SIZE);
@@ -341,7 +340,7 @@ int ServerIMPL::io_guest(int fd, short event)
 	return 0;
 }
 
-int ServerIMPL::recv_filter(int fd, const void* buf, size_t len, filt_telnetd::buffer_t* ibuf)
+int MultiplexerIMPL::recv_filter(int fd, const void* buf, size_t len, filt_telnetd::buffer_t* ibuf)
 {
 	filt_telnetd& srv( guest_set.data(fd) );
 	bool may_writable = srv.is_oempty();
@@ -356,7 +355,7 @@ int ServerIMPL::recv_filter(int fd, const void* buf, size_t len, filt_telnetd::b
 	return 0;
 }
 
-int ServerIMPL::send_to_guest(int fd, const void* buf, size_t len)
+int MultiplexerIMPL::send_to_guest(int fd, const void* buf, size_t len)
 {
 	filt_telnetd& srv( guest_set.data(fd) );
 	bool may_writable = srv.is_oempty();
@@ -370,7 +369,7 @@ int ServerIMPL::send_to_guest(int fd, const void* buf, size_t len)
 	return 0;
 }
 
-int ServerIMPL::guest_try_write(int fd, filt_telnetd& srv)
+int MultiplexerIMPL::guest_try_write(int fd, filt_telnetd& srv)
 {
 	// 現在の書き込み待ちバッファにあるバッファを書き込んでみて、
 	// 全部書き込めたらそのまま、書き込めなかったら書き込み待ちにする
@@ -399,13 +398,13 @@ int ServerIMPL::guest_try_write(int fd, filt_telnetd& srv)
 	return 0;
 }
 
-void ServerIMPL::remove_guest(int fd)
+void MultiplexerIMPL::remove_guest(int fd)
 {
 	filt_telnetd& srv( guest_set.data(fd) );
 	remove_guest(fd, srv);
 }
 
-void ServerIMPL::remove_guest(int fd, filt_telnetd& srv)
+void MultiplexerIMPL::remove_guest(int fd, filt_telnetd& srv)
 {
 	mpev.remove(fd, mp::EV_READ | (srv.is_oempty() ? 0 : mp::EV_WRITE));
 	guest_set.reset(fd);

@@ -27,7 +27,7 @@ int main(int argc, char* argv[])
 		pexit("bind");
 	}
 
-	Partty::Host host(ssock);
+	Partty::Host host(ssock, "test", 4, "", 0);
 	return host.run();
 }
 

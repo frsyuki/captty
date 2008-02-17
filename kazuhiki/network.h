@@ -11,35 +11,97 @@
 #include "kazuhiki/basic.h"
 
 namespace Kazuhiki {
-namespace Accept {
 
 
-namespace Network {
+namespace Convert {
+
+/*
 template <typename Address>
-bool ResolveHostNameIMPL(const char* str, Address& addr, bool resolve, int family, int flags,unsigned short port)
+struct HostNameIMPL {
+	HostNameIMPL(Address& _address, int _family, bool _resolve, unsigned short _port) :
+			address(_address), family(_family), resolve(_resolve), port(_port) {}
+	void operator() (const char* arg) {
+		Address v;
+		memset(&v, 0, sizeof(v));
+		if( !resolve ) {
+			if( family == AF_UNSPEC ) {
+				if( inet_pton(AF_INET,  arg, &((struct sockaddr_in* )&v)->sin_addr) > 0 ){
+					((struct sockaddr_in*)&v)->sin_family = AF_INET;
+					((struct sockaddr_in*)&v)->sin_len = sizeof(struct sockaddr_in);
+				} else if( inet_pton(AF_INET6, arg, &((struct sockaddr_in6*)&v)->sin6_addr) > 0 ) {
+					((struct sockaddr_in6*)&v)->sin6_family = AF_INET6;
+					((struct sockaddr_in6*)&v)->sin6_len = sizeof(struct sockaddr_in6);
+				} else {
+					throw InvalidArgumentError("Invalid address");
+					return false;
+				}
+			} else if( family == AF_INET ) {
+				if( inet_pton(AF_INET,  arg, &((struct sockaddr_in* )&v)->sin_addr) > 0 ){
+					((struct sockaddr_in*)&v)->sin_family = AF_INET;
+					((struct sockaddr_in*)&v)->sin_len = sizeof(struct sockaddr_in);
+				} else {
+					return false;
+				}
+			} else {  // family == AF_INET6
+				if( inet_pton(AF_INET6, arg, &((struct sockaddr_in6*)&v)->sin6_addr) > 0 ) {
+					((struct sockaddr_in6*)&v)->sin6_family = AF_INET6;
+					((struct sockaddr_in6*)&v)->sin6_len = sizeof(struct sockaddr_in6);
+				} else {
+					return false;
+				}
+			}
+		} else {
+			struct addrinfo hints;
+			memset(&hints, 0, sizeof(hints));
+			hints.ai_family = family;
+			hints.ai_socktype = SOCK_STREAM;    // TODO: 指定する？
+			hints.ai_flags = flags;
+			struct addrinfo *res = NULL;
+			int err;
+			if( (err=getaddrinfo(arg, NULL, &hints, &res)) != 0 ) {
+				return false;
+			}
+			struct addrinfo* rp(res);  // 最初の一つを使う
+			memcpy(&v, rp->ai_addr, rp->ai_addrlen);
+			freeaddrinfo(res);
+		}
+		addr = v;
+		((struct sockaddr_in*)&addr)->sin_port = htons(port);
+		return true;
+	}
+private:
+	Address& address;
+	int family;
+	bool resolve;
+	unsigned short port;
+};
+*/
+
+template <typename Address>
+bool HostNameIMPL(const char* arg, Address& addr, bool resolve, int family, int flags,unsigned short port)
 {
 	Address v;
 	memset(&v, 0, sizeof(v));
 	if( !resolve ) {
 		if( family == AF_UNSPEC ) {
-			if( inet_pton(AF_INET,  str, &((struct sockaddr_in* )&v)->sin_addr) > 0 ){
+			if( inet_pton(AF_INET,  arg, &((struct sockaddr_in* )&v)->sin_addr) > 0 ){
 				((struct sockaddr_in*)&v)->sin_family = AF_INET;
 				((struct sockaddr_in*)&v)->sin_len = sizeof(struct sockaddr_in);
-			} else if( inet_pton(AF_INET6, str, &((struct sockaddr_in6*)&v)->sin6_addr) > 0 ) {
+			} else if( inet_pton(AF_INET6, arg, &((struct sockaddr_in6*)&v)->sin6_addr) > 0 ) {
 				((struct sockaddr_in6*)&v)->sin6_family = AF_INET6;
 				((struct sockaddr_in6*)&v)->sin6_len = sizeof(struct sockaddr_in6);
 			} else {
 				return false;
 			}
 		} else if( family == AF_INET ) {
-			if( inet_pton(AF_INET,  str, &((struct sockaddr_in* )&v)->sin_addr) > 0 ){
+			if( inet_pton(AF_INET,  arg, &((struct sockaddr_in* )&v)->sin_addr) > 0 ){
 				((struct sockaddr_in*)&v)->sin_family = AF_INET;
 				((struct sockaddr_in*)&v)->sin_len = sizeof(struct sockaddr_in);
 			} else {
 				return false;
 			}
 		} else {  // family == AF_INET6
-			if( inet_pton(AF_INET6, str, &((struct sockaddr_in6*)&v)->sin6_addr) > 0 ) {
+			if( inet_pton(AF_INET6, arg, &((struct sockaddr_in6*)&v)->sin6_addr) > 0 ) {
 				((struct sockaddr_in6*)&v)->sin6_family = AF_INET6;
 				((struct sockaddr_in6*)&v)->sin6_len = sizeof(struct sockaddr_in6);
 			} else {
@@ -54,7 +116,7 @@ bool ResolveHostNameIMPL(const char* str, Address& addr, bool resolve, int famil
 		hints.ai_flags = flags;
 		struct addrinfo *res = NULL;
 		int err;
-		if( (err=getaddrinfo(str, NULL, &hints, &res)) != 0 ) {
+		if( (err=getaddrinfo(arg, NULL, &hints, &res)) != 0 ) {
 			return false;
 		}
 		struct addrinfo* rp(res);  // 最初の一つを使う
@@ -65,15 +127,17 @@ bool ResolveHostNameIMPL(const char* str, Address& addr, bool resolve, int famil
 	((struct sockaddr_in*)&addr)->sin_port = htons(port);
 	return true;
 }
-bool HostName(const char* str, struct sockaddr_in& addr, unsigned short port, bool resolve = true) {
-	return ResolveHostNameIMPL(str, addr, resolve, AF_INET, 0, port);
+
+bool HostName(const char* arg, struct sockaddr_in& addr, unsigned short port, bool resolve = true) {
+	return HostNameIMPL(arg, addr, resolve, AF_INET, 0, port);
 }
-bool HostName(const char* str, struct sockaddr_in6& addr, unsigned short port, bool resolve = true) {
-	return ResolveHostNameIMPL(str, addr, resolve, AF_INET6, 0, port);
+bool HostName(const char* arg, struct sockaddr_in6& addr, unsigned short port, bool resolve = true) {
+	return HostNameIMPL(arg, addr, resolve, AF_INET6, 0, port);
 }
-bool HostName(const char* str, struct sockaddr_storage& addr, unsigned short port, bool resolve = true) {
-	return ResolveHostNameIMPL(str, addr, resolve, AF_UNSPEC, AI_ADDRCONFIG, port);
+bool HostName(const char* arg, struct sockaddr_storage& addr, unsigned short port, bool resolve = true) {
+	return HostNameIMPL(arg, addr, resolve, AF_UNSPEC, AI_ADDRCONFIG, port);
 }
+
 
 bool AnyAddress(struct sockaddr_in& addr, unsigned short port) {
 	memset(&addr, 0, sizeof(addr));
@@ -96,6 +160,7 @@ bool AnyAddress(struct sockaddr_storage& addr, unsigned short port) {
 	((struct sockaddr_in6*)&addr)->sin6_addr = in6addr_any;
 	return true;
 }
+
 
 template <typename Address>
 bool NetworkInterfaceIMPL(const char* str, Address& addr, int family, unsigned short port) {
@@ -126,7 +191,11 @@ bool NetworkInterface(const char* str, struct sockaddr_storage& addr, unsigned s
 	return NetworkInterfaceIMPL(str, addr, AF_UNSPEC, port);
 }
 
-}  // namespace Network
+}  // namespace Convert
+
+
+
+namespace Accept {
 
 
 template <typename Address>
@@ -134,7 +203,7 @@ struct HostNameIMPL : Acceptable {
 	HostNameIMPL(Address& d) : data(d) {}
 	unsigned int operator() (int argc, char* argv[]) {
 		if( argc < 1 ) { throw LackOfArgumentsError("Host name is required"); }
-		if( !Network::HostName(argv[0], data, 0, true) ) {
+		if( !Convert::HostName(argv[0], data, 0, true) ) {
 			throw InvalidArgumentError("Invalid host name");
 		}
 		return 1;
@@ -151,7 +220,7 @@ struct IPAddressIMPL : Acceptable {
 	IPAddressIMPL(Address& d) : data(d) {}
 	unsigned int operator() (int argc, char* argv[]) {
 		if( argc < 1 ) { throw LackOfArgumentsError("IP address is required"); }
-		if( !Network::HostName(argv[0], data, 0, false) ) {
+		if( !Convert::HostName(argv[0], data, 0, false) ) {
 			throw InvalidArgumentError("Invalid address");
 		}
 		return 1;
@@ -165,7 +234,7 @@ IPAddressIMPL<Address> IPAddress(Address& a) { return IPAddressIMPL<Address>(a);
 
 
 ////
-// Flexible Passive Address
+// Flexible Listen Address
 //
 // 1. interface:port
 // 2. ip.add.re.ss:port
@@ -221,7 +290,7 @@ private:
 		} else {
 			// 5 .. 7
 			uint16_t p;
-			if( Basic::Numeric(str.c_str(), p) ) {
+			if( Convert::Numeric(str.c_str(), p) ) {
 				// 5
 				return resolve_any(str.c_str());
 			} else if( resolve_addr(str.c_str(), NULL) ) {
@@ -236,27 +305,27 @@ private:
 	bool resolve_addr(const char* addr, const char* port)
 	{
 		unsigned short p = dport;
-		if( port && !Basic::Numeric(port, p) ) {
+		if( port && !Convert::Numeric(port, p) ) {
 			return false;
 		}
-		return Network::HostName(addr, raddr, p, do_resolve);
+		return Convert::HostName(addr, raddr, p, do_resolve);
 	}
 	bool resolve_netif(const char* netif, const char* port)
 	{
 		unsigned short p = dport;
-		if( port && !Basic::Numeric(port, p) ) {
+		if( port && !Convert::Numeric(port, p) ) {
 			return false;
 		}
-		return Network::NetworkInterface(netif, raddr, p);
+		return Convert::NetworkInterface(netif, raddr, p);
 	}
 	bool resolve_any(const char* port)
 	{
 		// FIXME
 		unsigned short p = dport;
-		if( port && !Basic::Numeric(port, p) ) {
+		if( port && !Convert::Numeric(port, p) ) {
 			return false;
 		}
-		return Network::AnyAddress(raddr, p);
+		return Convert::AnyAddress(raddr, p);
 	}
 private:
 	Address& raddr;
@@ -322,17 +391,16 @@ private:
 	}
 	bool resolve_addr(const char* addr, const char* port) {
 		unsigned short p = dport;
-		if( port && !Basic::Numeric(port, p) ) {
+		if( port && !Convert::Numeric(port, p) ) {
 			return false;
 		}
-		return Network::HostName(addr, raddr, p, do_resolve);
+		return Convert::HostName(addr, raddr, p, do_resolve);
 	}
 private:
 	Address& raddr;
 	unsigned short dport;
 	bool do_resolve;
 };
-
 template <typename Address>
 FlexibleActiveHostIMPL<Address> FlexibleActiveHost(Address& a, uint16_t default_port, bool resolve = true) {
 	return FlexibleActiveHostIMPL<Address>(a, default_port, resolve);
@@ -340,6 +408,7 @@ FlexibleActiveHostIMPL<Address> FlexibleActiveHost(Address& a, uint16_t default_
 
 
 }  // namespace Accept
+
 }  // namespace Kazuhiki
 
 #endif /* kazuhiki/network.h */
