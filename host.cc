@@ -1,57 +1,20 @@
-#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/ioctl.h>
 #include <fcntl.h>
-#include <mp/dispatch.h>
+#include "host.h"
 #include "scoped_make_raw.h"
 #include "ptyshell.h"
 #include "unio.h"
-#include "partty.h"
+
+#include <iostream>
 
 namespace Partty {
 
+
 // FIXME 例外処理
-
-
-class HostIMPL {
-public:
-	HostIMPL(int server_socket,
-		const char* session_name, size_t session_name_length,
-		const char* password, size_t password_length);
-	int run(void);
-private:
-	int sh;
-	int host;
-	int server;
-
-	char m_session_name[MAX_SESSION_NAME_LENGTH];
-	char m_password[MAX_PASSWORD_LENGTH];
-	size_t m_session_name_length;
-	size_t m_password_length;
-private:
-	HostIMPL();
-	HostIMPL(const HostIMPL&);
-private:
-	int io_stdin(int fd, short event);
-	int io_server(int fd, short event);
-	int io_shell(int fd, short event);
-private:
-	typedef mp::dispatch<void> mpdispatch;
-	mpdispatch mpdp;
-	static const size_t SHARED_BUFFER_SIZE = 32 * 1024;
-	char shared_buffer[SHARED_BUFFER_SIZE];
-	static const int STDIN  = 0;
-	static const int STDOUT = 1;
-private:
-	struct winsize winsz;
-	static int get_window_size(int fd, struct winsize* ws);
-	static int set_window_size(int fd, struct winsize* ws);
-};
-
 
 Host::Host(int server_socket,
 	const char* session_name, size_t session_name_length,
@@ -59,7 +22,6 @@ Host::Host(int server_socket,
 		impl(new HostIMPL(server_socket,
 			session_name, session_name_length,
 			password, password_length )) {}
-Host::~Host() { delete impl; }
 
 HostIMPL::HostIMPL(int server_socket,
 	const char* session_name, size_t session_name_length,
@@ -75,13 +37,20 @@ HostIMPL::HostIMPL(int server_socket,
 	std::memcpy(m_password, password, m_password_length);
 }
 
+
+Host::~Host() { delete impl; }
+HostIMPL::~HostIMPL() {}
+
+
 int Host::run(void) { return impl->run(); }
 int HostIMPL::run(void)
 {
+	// Serverにヘッダを送る
 	negotiation_header_t header;
 	memcpy(header.magic, NEGOTIATION_MAGIC_STRING, NEGOTIATION_MAGIC_STRING_LENGTH);
+
 	// headerにはネットワークバイトオーダーで入れる
-	header.user_name_length    = htons(0);
+	header.user_name_length    = htons(0);   // user_nameは今のところ空
 	header.session_name_length = htons(m_session_name_length);
 	header.password_length     = htons(m_password_length);
 	if( write_all(server, (char*)&header, sizeof(header)) != sizeof(header) ) {
@@ -94,36 +63,47 @@ int HostIMPL::run(void)
 		pexit("write password");
 	}
 
-	ptyshell psh(STDIN);
+	// 新しい仮想端末を確保して、シェルを起動する
+	ptyshell psh(STDIN_FILENO);
 	if( psh.fork(NULL) < 0 ) { pexit("psh.fork"); }
 	sh = psh.masterfd();
 
+	// 標準入力をRawモードにする
 	// makerawはPtyChildShellをforkした後
-	PtyScopedMakeRaw makeraw(STDIN);
+	// （forkする前にRawモードにすると子仮想端末までRawモードになってしまう）
+	PtyScopedMakeRaw makeraw(STDIN_FILENO);
 
-	if( fcntl(STDIN,  F_SETFL, O_NONBLOCK) < 0 ) { pexit("set stdin nonblock");  }
+	// 監視対象のファイルディスクリプタにO_NONBLOCKをセット
+	if( fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK) < 0 ) { pexit("set stdin nonblock");  }
 	if( fcntl(server, F_SETFL, O_NONBLOCK) < 0 ) { pexit("set server nonblock"); }
-	if( fcntl(sh,     F_SETFL, O_NONBLOCK) < 0 ) { pexit("set sh nonblock");     }
+	if( fcntl(sh, F_SETFL, O_NONBLOCK) < 0 ) { pexit("set sh nonblock");     }
 
+	// 入力待ち
 	using namespace mp::placeholders;
-	if( mpdp.add(STDIN,  mp::EV_READ, mp::bind(&HostIMPL::io_stdin, this, _1, _2)) < 0 ) {
+	if( mpdp.add(STDIN_FILENO, mp::EV_READ,
+			mp::bind(&HostIMPL::io_stdin, this, _1, _2)) < 0 ) {
 		pexit("mpdp.add stdin");
 	}
-	if( mpdp.add(server, mp::EV_READ, mp::bind(&HostIMPL::io_server, this, _1, _2)) < 0 ) {
+	if( mpdp.add(server, mp::EV_READ,
+			mp::bind(&HostIMPL::io_server, this, _1, _2)) < 0 ) {
 		pexit("mpdp.add server");
 	}
-	if( mpdp.add(sh,     mp::EV_READ, mp::bind(&HostIMPL::io_shell, this, _1, _2)) < 0 ) {
+	if( mpdp.add(sh, mp::EV_READ,
+			mp::bind(&HostIMPL::io_shell, this, _1, _2)) < 0 ) {
 		pexit("mpdp.add sh");
 	}
 
-	get_window_size(STDIN, &winsz);
+	// 端末のウィンドウサイズを取得しておく
+	get_window_size(STDIN_FILENO, &winsz);
 
+	// mp::dispatch::run
 	return mpdp.run();
 }
 
 
 int HostIMPL::io_stdin(int fd, short event)
 {
+	// 標準入力 -> シェル
 	ssize_t len = read(fd, shared_buffer, SHARED_BUFFER_SIZE);
 	if( len < 0 ) {
 		if( errno == EAGAIN || errno == EINTR ) {
@@ -137,7 +117,7 @@ int HostIMPL::io_stdin(int fd, short event)
 	if( write_all(sh, shared_buffer, len) != (size_t)len ){
 		pexit("write to sh");
 	}
-	// ウィンドウサイズを設定
+	// 標準入力のウィンドウサイズが変更されたら子仮想端末にも反映する
 	struct winsize next;
 	get_window_size(fd, &next);
 	if( winsz.ws_row != next.ws_row || winsz.ws_col != next.ws_col ) {
@@ -149,6 +129,7 @@ int HostIMPL::io_stdin(int fd, short event)
 
 int HostIMPL::io_server(int fd, short event)
 {
+	// Server -> シェル
 	ssize_t len = read(fd, shared_buffer, SHARED_BUFFER_SIZE);
 	if( len < 0 ) {
 		if( errno == EAGAIN || errno == EINTR ) {
@@ -168,6 +149,8 @@ int HostIMPL::io_server(int fd, short event)
 
 int HostIMPL::io_shell(int fd, short event)
 {
+	// シェル -> 標準出力
+	// シェル -> Server
 	ssize_t len = read(fd, shared_buffer, SHARED_BUFFER_SIZE);
 	if( len < 0 ) {
 		if( errno == EAGAIN || errno == EINTR ) {
@@ -179,14 +162,15 @@ int HostIMPL::io_shell(int fd, short event)
 		perror("end of sh");
 		return 1;
 	}
-	if( write_all(STDOUT, shared_buffer, len) != (size_t)len ) {
+	if( write_all(STDOUT_FILENO, shared_buffer, len) != (size_t)len ) {
 		pexit("write to stdout");
 	}
 	if( write_all(server, shared_buffer, len) != (size_t)len ) {
 		pexit("write to server");
 	}
-	// 端末にバッファを書き込み終わるまで待つ
-	tcdrain(STDOUT);
+	// 標準出力の転送が終わるまで待つ
+	// （転送スピードを超過して書き込むと端末が壊れるため）
+	tcdrain(STDOUT_FILENO);
 	return 0;
 }
 

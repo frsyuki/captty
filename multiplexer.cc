@@ -1,147 +1,18 @@
-#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <cstring>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <bitset>
 #include <limits>
-#include <mp/event.h>
+#include "multiplexer.h"
 #include "scoped_make_raw.h"
 #include "unio.h"
 #include "fdtransport.h"
-#include "emtelnet.h"
-#include "sparse_array.h"
-#include "partty.h"
+
+#include <iostream>
 
 namespace Partty {
-
-
-class filt_telnetd : public emtelnet {
-public:
-	struct buffer_t {
-		const char* buf;
-		size_t len;
-	};
-public:
-	filt_telnetd();
-	inline void send(const void* buf, size_t len, buffer_t* out);
-	inline void recv(const void* buf, size_t len, buffer_t* in, buffer_t* out);
-	inline void iclear(void);
-	inline void oclear(void);
-	inline void iconsumed(size_t len);
-	inline void oconsumed(size_t len);
-	inline bool is_oempty(void) { return olength == 0; }
-	inline bool is_iempty(void) { return ilength == 0; }
-	inline void get_ibuffer(buffer_t* in);
-	inline void get_obuffer(buffer_t* out);
-private:
-	static void pass_through_handler(char cmd, bool sw, emtelnet& base) {}
-};
-
-filt_telnetd::filt_telnetd() : emtelnet((void*)this)
-{
-	// use these options
-	set_my_option_handler( emtelnet::OPT_SGA,
-			filt_telnetd::pass_through_handler );
-	set_my_option_handler( emtelnet::OPT_ECHO,
-			filt_telnetd::pass_through_handler );
-	set_my_option_handler( emtelnet::OPT_BINARY,
-			filt_telnetd::pass_through_handler );
-
-	// supported partner options
-	set_partner_option_handler( emtelnet::OPT_BINARY,
-			filt_telnetd::pass_through_handler );
-
-	// prevent line mode
-	send_will(emtelnet::OPT_SGA);
-	send_will(emtelnet::OPT_ECHO);
-	send_dont(emtelnet::OPT_ECHO);
-	send_dont(emtelnet::OPT_LINEMODE);
-
-	// enable multibyte characters
-	send_will(emtelnet::OPT_BINARY);
-	send_do(emtelnet::OPT_BINARY);
-}
-
-void filt_telnetd::send(const void* buf, size_t len, buffer_t* out)
-{
-	emtelnet::send(buf, len);
-	if( out ) { get_obuffer(out); }
-}
-
-void filt_telnetd::recv(const void* buf, size_t len, buffer_t* in, buffer_t* out)
-{
-	emtelnet::recv(buf, len);
-	if( out ) { get_obuffer(out); }
-	if( in ) { get_ibuffer(in); }
-}
-
-void filt_telnetd::iconsumed(size_t len) {
-	ilength -= len;
-	std::memmove(ibuffer, ibuffer+len, ilength);
-}
-void filt_telnetd::oconsumed(size_t len) {
-	// FIXME 効率が悪い
-	// でもほとんど呼ばれない
-	olength -= len;
-	std::memmove(obuffer, obuffer+len, olength);
-}
-
-void filt_telnetd::iclear(void) { ilength = 0; }
-void filt_telnetd::oclear(void) { olength = 0; }
-
-void filt_telnetd::get_ibuffer(buffer_t* in) {
-	in->buf = ibuffer;
-	in->len = ilength;
-}
-void filt_telnetd::get_obuffer(buffer_t* out) {
-	out->buf = obuffer;
-	out->len = olength;
-}
-
-
-
-class MultiplexerIMPL {
-public:
-	MultiplexerIMPL(int host_socket, int gate_socket,
-		const char* session_name, size_t session_name_length,
-		const char* password, size_t password_length);
-	~MultiplexerIMPL();
-	int run(void);
-private:
-	int host;
-	int gate;
-
-	typedef mp::event<void> mpevent;
-	mpevent mpev;
-
-	typedef sparse_array<filt_telnetd> guest_set_t;
-	guest_set_t guest_set;
-	int num_guest;
-
-	static const size_t SHARED_BUFFER_SIZE = 32 * 1024;
-	char shared_buffer[SHARED_BUFFER_SIZE];
-
-	char m_session_name[MAX_SESSION_NAME_LENGTH];
-	char m_password[MAX_PASSWORD_LENGTH];
-	size_t m_session_name_length;
-	size_t m_password_length;
-private:
-	int io_host(int fd, short event);
-	int io_gate(int fd, short event);
-	int io_guest(int fd, short event);
-	int recv_filter(int fd, const void* buf, size_t len, filt_telnetd::buffer_t* ibuf);
-	int send_to_guest(int fd, const void* buf, size_t len);
-	int guest_try_write(int fd, filt_telnetd& srv);
-	void remove_guest(int fd);
-	void remove_guest(int fd, filt_telnetd& srv);
-private:
-	MultiplexerIMPL();
-	MultiplexerIMPL(const MultiplexerIMPL&);
-};
-
 
 
 Multiplexer::Multiplexer(int host_socket, int gate_socket,
@@ -150,9 +21,6 @@ Multiplexer::Multiplexer(int host_socket, int gate_socket,
 		impl(new MultiplexerIMPL( host_socket, gate_socket,
 			     session_name, session_name_length,
 			     password, password_length )) {}
-Multiplexer::~Multiplexer() { delete impl; }
-
-
 MultiplexerIMPL::MultiplexerIMPL(int host_socket, int gate_socket,
 	   const char* session_name, size_t session_name_length,
 	   const char* password, size_t password_length ) :
@@ -167,14 +35,18 @@ MultiplexerIMPL::MultiplexerIMPL(int host_socket, int gate_socket,
 	std::memcpy(m_session_name, session_name, m_session_name_length);
 	std::memcpy(m_password, password, m_password_length);
 
+	// 監視対象のファイルディスクリプタにO_NONBLOCKをセット
 	if( fcntl(host, F_SETFL, O_NONBLOCK) < 0 ) { pexit("set host nonblock"); }
 	if( fcntl(gate, F_SETFL, O_NONBLOCK) < 0 ) { pexit("set gate nonblock"); }
 	if( mpev.add(host, mp::EV_READ) < 0 ) { pexit("mpev.add host"); }
 	if( mpev.add(gate, mp::EV_READ) < 0 ) { pexit("mpev.add gate"); }
 }
 
+
+Multiplexer::~Multiplexer() { delete impl; }
 MultiplexerIMPL::~MultiplexerIMPL()
 {
+	// すべてのゲストをclose
 	if( num_guest > 0 ) {
 		int n = 0;
 		int to = num_guest;
@@ -211,8 +83,47 @@ int MultiplexerIMPL::run(void)
 	return 0;
 }
 
+int MultiplexerIMPL::io_gate(int fd, short event)
+{
+	// Gateからゲストのファイルディスクリプタを受け取る
+	gate_message_t msg;
+	int guest = recvfd(gate, &msg, sizeof(msg));
+	if( guest < 0 ) {
+		if( errno == EAGAIN || errno == EINTR ) {
+			return 0;
+		} else {
+			perror("guest connection failed a");
+			return 0;
+		}
+	}
+	// セッション名とパスワードをチェック
+	if( msg.password.len != m_password_length ||
+	    memcmp(msg.password.str, m_password, m_password_length) != 0 ||
+	    msg.session_name.len != m_session_name_length ||
+	    memcmp(msg.session_name.str, m_session_name, m_session_name_length) != 0 ) {
+		perror("guest authentication failed");
+		close(guest);
+		return 0;
+	}
+	// ゲストを監視対象に追加
+	if( fcntl(guest, F_SETFL, O_NONBLOCK) < 0 ||
+			mpev.add(guest, mp::EV_READ | mp::EV_WRITE) < 0 ) {
+			// イベント待ちは readable or writable から始める
+		perror("guest connection failed b");
+		close(guest);
+		return 0;
+	}
+	guest_set.set(guest, new filt_telnetd);
+	// 書き込み待ちバッファにPARTTY_SERVER_WELCOME_MESSAGEを加える
+	guest_set.data(guest).send(PARTTY_SERVER_WELCOME_MESSAGE, strlen(PARTTY_SERVER_WELCOME_MESSAGE), NULL);
+	num_guest++;
+	return 0;
+}
+
 int MultiplexerIMPL::io_host(int fd, short event)
 {
+	// Host -> ゲスト
+	// Hostからread
 	ssize_t len = read(fd, shared_buffer, SHARED_BUFFER_SIZE);
 	if( len < 0 ) {
 		if( errno == EAGAIN || errno == EINTR ) {
@@ -226,11 +137,15 @@ int MultiplexerIMPL::io_host(int fd, short event)
 		return -1;
 	}
 	// len > 0
+	// ゲストにwrite
 	if( num_guest == 0 ) { return 0; }
 	int n = 0;
 	int to = num_guest;  // forの中でnum_guestが変動するので、ここで保存しておく
 	for(int fd = 0; fd < INT_MAX; ++fd) {
 		if( guest_set.test(fd) ) {
+			// send_to_guestはすべてのデータを書き込めないかもしれない
+			// すべて書き込めなければファイルディスクリプタをEV_WRITEで監視し、
+			// io_guestで書き込む
 			send_to_guest(fd, shared_buffer, len);  // ここでremove_guest()が実行されるかもしれない
 			++n;
 			if( n >= to ) { break; }
@@ -239,42 +154,11 @@ int MultiplexerIMPL::io_host(int fd, short event)
 	return 0;
 }
 
-int MultiplexerIMPL::io_gate(int fd, short event)
-{
-	gate_message_t msg;
-	int guest = recvfd(gate, &msg, sizeof(msg));
-	if( guest < 0 ) {
-		if( errno == EAGAIN || errno == EINTR ) {
-			return 0;
-		} else {
-			perror("guest connection failed a");
-			return 0;
-		}
-	}
-	if( msg.password.len != m_password_length ||
-	    memcmp(msg.password.str, m_password, m_password_length) != 0 ||
-	    msg.session_name.len != m_session_name_length ||
-	    memcmp(msg.session_name.str, m_session_name, m_session_name_length) != 0 ) {
-		perror("guest authentication failed");
-		close(guest);
-		return 0;
-	}
-	if( fcntl(guest, F_SETFL, O_NONBLOCK) < 0 ||
-			mpev.add(guest, mp::EV_READ | mp::EV_WRITE) < 0 ) {
-			// イベント待ちは readable or writable から始める
-		perror("guest connection failed b");
-		close(guest);
-		return 0;
-	}
-	guest_set.set(guest, new filt_telnetd);
-	guest_set.data(guest).send(PARTTY_SERVER_WELCOME_MESSAGE, strlen(PARTTY_SERVER_WELCOME_MESSAGE), NULL);
-	num_guest++;
-	return 0;
-}
-
 int MultiplexerIMPL::io_guest(int fd, short event)
 {
 	if( event & mp::EV_READ ) {
+		// ゲスト -> Host
+		// ゲストからread
 		ssize_t len = read(fd, shared_buffer, SHARED_BUFFER_SIZE);
 		if( len < 0 ) {
 			if( errno == EAGAIN || errno == EINTR ) {
@@ -305,10 +189,10 @@ int MultiplexerIMPL::io_guest(int fd, short event)
 		}
 	}
 	if( event & mp::EV_WRITE ) {
-		// 書き込み待ちバッファを書き込む
+		// 書き込み待ちバッファ -> ゲスト
 		filt_telnetd& srv( guest_set.data(fd) );
 		ssize_t len = write(fd, srv.obuffer, srv.olength);
-		if( srv.olength == 0 ) { return 0; }  // olengthは0の可能性がある
+		//if( srv.olength == 0 ) { return 0; }  // olengthは0の可能性がある？
 		if( len < 0 ) {
 			if( errno == EAGAIN || errno == EINTR ) {
 				// do nothing
@@ -347,6 +231,7 @@ int MultiplexerIMPL::recv_filter(int fd, const void* buf, size_t len, filt_telne
 	srv.recv(buf, len, ibuf, NULL);  // recvしたときにもobufが発生する
 	srv.iclear();   // 呼び出し側はibufを確実に使い切らないといけない
 	if( may_writable ) {
+		// 書き込み待ちバッファが空だったので書き込めるかもしれない
 		if( guest_try_write(fd, srv) < 0 ) {
 			remove_guest(fd, srv);
 			return -1;
@@ -361,6 +246,7 @@ int MultiplexerIMPL::send_to_guest(int fd, const void* buf, size_t len)
 	bool may_writable = srv.is_oempty();
 	srv.send(buf, len, NULL);
 	if( may_writable ) {
+		// 書き込み待ちバッファが空だったので書き込めるかもしれない
 		if( guest_try_write(fd, srv) < 0 ) {
 			remove_guest(fd, srv);
 			return -1;
@@ -374,7 +260,7 @@ int MultiplexerIMPL::guest_try_write(int fd, filt_telnetd& srv)
 	// 現在の書き込み待ちバッファにあるバッファを書き込んでみて、
 	// 全部書き込めたらそのまま、書き込めなかったら書き込み待ちにする
 	// 書き込みバッファが無かった状態から書き込み待ちバッファがある状態に
-	// 遷移したときにのみ、この関数を呼べる。
+	// 遷移したときにのみ、この関数を呼べる
 	if( srv.olength <= 0 ) { return 0; }
 	ssize_t wlen = write(fd, srv.obuffer, srv.olength);
 	if( wlen < 0 && errno != EAGAIN && errno != EINTR ) {

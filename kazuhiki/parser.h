@@ -26,17 +26,18 @@ public:
 		for(map_t::iterator it(map.begin()), it_end(map.end());
 				it != it_end;
 				++it ) {
-			delete it->second;
+			delete it->second.accept;
 		}
 	}
-	void set(const std::string& key, Acceptable* base)
+	void set(const std::string& key, Acceptable* base, bool* notify)
 	{
 		map_t::iterator a( map.find(key) );
 		if( a == map.end() ) {
-			map.insert( std::make_pair(key, base) );
+			map.insert( std::make_pair(key, item_t(base,notify)) );
 		} else {
-			delete a->second;
-			a->second = base;
+			delete a->second.accept;
+			a->second.accept = base;
+			a->second.notify = notify;
 		}
 	}
 	Acceptable* search(const std::string& key)
@@ -45,11 +46,17 @@ public:
 		if( a == map.end() ) {
 			return NULL;
 		} else {
-			return a->second;
+			if( a->second.notify ) { *a->second.notify = true; }
+			return a->second.accept;
 		}
 	}
 private:
-	typedef std::map<std::string, Acceptable*> map_t;
+	struct item_t {
+		item_t(Acceptable* a, bool* n) : accept(a), notify(n) {}
+		Acceptable* accept;
+		bool* notify;
+	};
+	typedef std::map<std::string, item_t> map_t;
 	map_t map;
 };
 
@@ -86,18 +93,30 @@ struct InvalidArgumentError : ArgumentError {
 
 class Parser {
 public:
-	Parser() : unparsed(0) {}
+	Parser() {}
 public:
+	template <typename Accept>
+	void on( const std::string& short_name,
+		 const std::string& long_name,
+		 Accept ac, bool& notify)
+	{
+		if(!short_name.empty()) {
+			map.set(short_name, new Accept(ac), &notify);
+		}
+		if(!long_name.empty()) {
+			map.set(long_name, new Accept(ac), &notify);
+		}
+	}
 	template <typename Accept>
 	void on( const std::string& short_name,
 		 const std::string& long_name,
 		 Accept ac)
 	{
 		if(!short_name.empty()) {
-			map.set(short_name, new Accept(ac));
+			map.set(short_name, new Accept(ac), NULL);
 		}
 		if(!long_name.empty()) {
-			map.set(long_name, new Accept(ac));
+			map.set(long_name, new Accept(ac), NULL);
 		}
 	}
 	void parse(int argc, char* argv[])
@@ -158,7 +177,6 @@ private:
 		throw UnknownArgumentError(argv[i]);
 	}
 private:
-	int unparsed;
 	AcceptableMap map;
 };
 

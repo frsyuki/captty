@@ -66,6 +66,7 @@ struct negotiation_header_t {
 };
 
 
+// Hostを待ち受け、Multiplexerをforkする
 class ServerIMPL;
 class Server {
 public:
@@ -79,6 +80,8 @@ private:
 };
 
 
+// Hostからの入力をゲストにコピーする
+// ゲストからの入力をHostにコピーする
 class MultiplexerIMPL;
 class Multiplexer {
 public:
@@ -94,6 +97,9 @@ private:
 };
 
 
+// 新しい仮想端末を確保して、シェルを起動する
+// 標準入力とServerからの入力をシェルにコピーする
+// シェルの出力と標準出力をServerにコピーする
 class HostIMPL;
 class Host {
 public:
@@ -109,6 +115,8 @@ private:
 };
 
 
+// ゲストを待ち受け、ファイルディスクリプタを
+// Hostに転送する
 class GateIMPL;
 class Gate {
 public:

@@ -4,72 +4,17 @@
 #include <unistd.h>
 #include <signal.h>
 #include <limits.h>
+#include "gate.h"
 #include "scoped_make_raw.h"
 #include "fdtransport.h"
 #include "unio.h"
-#include "emtelnet.h"
-#include "partty.h"
 
 #include <iostream>
 
 namespace Partty {
 
 
-class phrase_telnetd : public emtelnet {
-private:
-	static void pass_through_handler(char cmd, bool sw, emtelnet& base) {}
-public:
-	phrase_telnetd() : emtelnet((void*)this) {
-		// use these options
-		// force clinet line mode
-		//set_my_option_handler( emtelnet::OPT_SGA,
-		//		phrase_telnetd::pass_through_handler );
-		set_my_option_handler( emtelnet::OPT_BINARY,
-				phrase_telnetd::pass_through_handler );
-
-		// supported partner options
-		set_partner_option_handler( emtelnet::OPT_ECHO,
-				phrase_telnetd::pass_through_handler );
-		set_partner_option_handler( emtelnet::OPT_LINEMODE,
-				phrase_telnetd::pass_through_handler );
-		set_partner_option_handler( emtelnet::OPT_BINARY,
-				phrase_telnetd::pass_through_handler );
-
-		//send_will(emtelnet::OPT_SGA);
-	}
-private:
-	phrase_telnetd(const phrase_telnetd&);
-};
-
-
-class GateIMPL {
-public:
-	GateIMPL(int listen_socket);
-	int run(void);
-private:
-	int accept_guest(void);
-	static ssize_t write_message(phrase_telnetd& td, int guest, const char* buf, size_t count);
-	static ssize_t read_line(phrase_telnetd& td, int guest, char* buf, size_t count);
-private:
-	int socket;
-	char gate_path[PATH_MAX + MAX_SESSION_NAME_LENGTH];
-	size_t gate_dir_len;
-private:
-	GateIMPL();
-	GateIMPL(const GateIMPL&);
-private:
-	static const int E_SUCCESS = 0;
-	static const int E_ACCEPT = 1;
-	static const int E_FINISH = 2;
-	static const int E_SENDFD = 3;
-	static const int E_SESSION_NAME   = 4;
-	static const int E_PASSWORD = 5;
-};
-
-
 Gate::Gate(int listen_socket) : impl(new GateIMPL(listen_socket)) {}
-Gate::~Gate() { delete impl; }
-
 GateIMPL::GateIMPL(int listen_socket) : socket(listen_socket)
 {
 	// FIXME strlen(GATE_DIR) > PATH_MAX
@@ -77,6 +22,9 @@ GateIMPL::GateIMPL(int listen_socket) : socket(listen_socket)
 	memcpy(gate_path, GATE_DIR, gate_dir_len);
 	// この時点ではgate_pathにはNULL終端が付いていない
 }
+
+Gate::~Gate() { delete impl; }
+GateIMPL::~GateIMPL() {}
 
 int Gate::run(void) { return impl->run(); }
 int GateIMPL::run(void)
@@ -169,6 +117,8 @@ int GateIMPL::accept_guest(void)
 	return E_SUCCESS;
 }
 
+
+// telnetdを経由してバッファを書き込む
 ssize_t GateIMPL::write_message(phrase_telnetd& td, int guest, const char* buf, size_t count)
 {
 	td.send(buf, count);
@@ -183,6 +133,7 @@ ssize_t GateIMPL::write_message(phrase_telnetd& td, int guest, const char* buf, 
 }
 
 
+// 1行読み込んで余剰分を捨てる
 ssize_t GateIMPL::read_line(phrase_telnetd& td, int guest, char* buf, size_t count)
 {
 	char* p = buf;
