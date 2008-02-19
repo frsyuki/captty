@@ -27,8 +27,9 @@ ServerIMPL::~ServerIMPL()
 
 Lobby::Lobby(int listen_socket) : sock(listen_socket), max_fd(-1)
 {
-	if( fcntl(sock, F_SETFL, O_NONBLOCK) < 0 )
-		{ throw initialize_error("failed to set listen socket nonblock mode"); }
+	if( fcntl(sock, F_SETFL, O_NONBLOCK) < 0 ) {
+		throw initialize_error("failed to set listen socket nonblock mode");
+	}
 	using namespace mp::placeholders;
 	if( mp::ios::ios_accept(mp, sock,
 			mp::bind(&Lobby::io_header, this, _1, _2) ) < 0 ) {
@@ -50,6 +51,7 @@ int ServerIMPL::run(void)
 	pid_t pid;
 	ScopedLobby lobby(sock);
 	while(1) {
+	// FIXME シグナルハンドラ
 		int ret = lobby.next(info);
 		if( ret < 0 ) {
 			// FIXME
@@ -79,8 +81,9 @@ void ScopedLobby::forked_destroy(int fd) {
 
 void Lobby::forked_destroy(int fd)
 {
-	// FIXME
-	for(int i = 0; i <= max_fd; ++i) {
+	// 標準エラー出力から先を閉じる
+	// FIXME 0,1,2は標準入出力でないかもしれない
+	for(int i = 3; i <= max_fd; ++i) {
 		if( i != fd ) {
 			close(i);
 		}
@@ -100,19 +103,21 @@ int Lobby::io_header(mpio& mp, int fd)
 {
 	if( fd < 0 ) { return -1; }
 	void* buf = mp.pool.malloc(BUFFER_SIZE);
-	if( buf == NULL ) { remove_host(fd); return -1; }
+	if( buf == NULL ) {
+		remove_host(fd);
+		return -1;
+	}
 	if( fd > max_fd ) { max_fd = fd; }
 std::cerr << "accepted " << fd << std::endl;
 	using namespace mp::placeholders;
 	if( mp::ios::ios_read_just(mp, fd, buf, sizeof(negotiation_header_t),
 			mp::bind(&Lobby::io_payload, this, _1, _2, _3, _4, _5)) < 0 ) {
 		remove_host(fd, buf);
-		return 0;
+		return -1;
 	}
 perror("waiting header");
 	return 0;
 }
-
 
 
 int Lobby::io_payload(mpio& mp, int fd, void* buf, size_t just, size_t len)
@@ -125,7 +130,7 @@ perror("header reached");
 
 	negotiation_header_t* header = reinterpret_cast<negotiation_header_t*>(buf);
 	if( memcmp(NEGOTIATION_MAGIC_STRING, header->magic, NEGOTIATION_MAGIC_STRING_LENGTH) != 0 ) {
-		remove_host(fd, buf);
+		send_error_reply(fd, buf, negotiation_reply::PROTCOL_MISMATCH, "protocol mismatch");
 		return 0;
 	}
 
@@ -136,10 +141,10 @@ perror("header reached");
 
 	if( header->user_name_length    > MAX_USER_NAME_LENGTH    ||
 	    header->session_name_length > MAX_SESSION_NAME_LENGTH ||
+	    header->session_name_length < MIN_SESSION_NAME_LENGTH ||
 	    header->password_length     > MAX_PASSWORD_LENGTH     ||
 	    header->session_name_length == 0 ) {
-		// FIXME Hostにメッセージを返す？
-		remove_host(fd, buf);
+		send_error_reply(fd, buf, negotiation_reply::AUTHENTICATION_FAILED, "authentication failed");
 		return 0;
 	}
 
@@ -150,7 +155,7 @@ perror("header ok");
 				header->session_name_length +
 				header->password_length,
 			mp::bind(&Lobby::io_fork, this, _1, _2, _3, _4, _5)) < 0 ) {
-		remove_host(fd, buf);
+		send_error_reply(fd, buf, negotiation_reply::SERVER_ERROR, "multiplexer is broken");
 		return 0;
 	}
 
@@ -158,6 +163,38 @@ std::cerr << "waiting length " << (header->user_name_length + header->session_na
 				<< std::endl;
 	return 0;
 }
+
+
+int Lobby::io_error_reply(mpio& mp, int fd, void* buf, size_t just, size_t len)
+{
+perror("io_error_reply");
+std::cerr << len << " " << just << std::endl;
+	remove_host(fd, buf);
+	return 0;
+}
+
+
+void Lobby::send_error_reply(int fd, void* buf, uint16_t code, const char* message)
+{
+	send_error_reply(fd, buf, code, message, strlen(message));
+}
+
+void Lobby::send_error_reply(int fd, void* buf, uint16_t code, const char* message, size_t message_length)
+{
+	if( message_length + sizeof(negotiation_reply_t) > BUFFER_SIZE) {
+		remove_host(fd, buf);  // FIXME
+	}
+	negotiation_reply_t* reply = reinterpret_cast<negotiation_reply_t*>(buf);
+	reply->code = htons(code);
+	reply->message_length = htons(message_length);
+	memcpy((char*)buf + sizeof(negotiation_reply_t), message, message_length);
+	using namespace mp::placeholders;
+	if( mp::ios::ios_write_just(mp, fd, buf, sizeof(negotiation_reply_t) + message_length,
+			mp::bind(&Lobby::io_error_reply, this, _1, _2, _3, _4, _5)) < 0 ) {
+		remove_host(fd, buf);
+	}
+}
+
 
 int Lobby::io_fork(mpio& mp, int fd, void* payload, size_t just, size_t len)
 {
@@ -213,6 +250,26 @@ void Lobby::remove_host(int fd, void* buf)
 }
 
 
+int ServerIMPL::sync_reply(int fd, uint16_t code, const char* message)
+{
+	return sync_reply(fd, code, message, strlen(message));
+}
+
+int ServerIMPL::sync_reply(int fd, uint16_t code, const char* message, size_t message_length)
+{
+	size_t buflen = sizeof(negotiation_reply_t) + message_length;
+	char* buf = (char*)malloc(buflen);
+	if( buf == NULL ) { return -1; }
+	negotiation_reply_t* reply = reinterpret_cast<negotiation_reply_t*>(buf);
+	reply->code = htons(code);
+	reply->message_length = htons(message_length);
+	memcpy((char*)buf + sizeof(negotiation_reply_t), message, message_length);
+	if( write_all(fd, buf, buflen) != buflen ) {
+		return -1;
+	}
+	return 0;
+}
+
 int ServerIMPL::run_multiplexer(host_info_t& info)
 {
 	char gate_path[PATH_MAX + Partty::MAX_SESSION_NAME_LENGTH];
@@ -221,14 +278,38 @@ int ServerIMPL::run_multiplexer(host_info_t& info)
 	memcpy(gate_path + gate_dir_len, info.session_name, info.session_name_length);
 	gate_path[gate_dir_len + info.session_name_length] = '\0';
 
-	int gate = listen_gate(gate_path);
-	if( gate < 0 ) { pexit("listen_gate"); }  // FIXME hostになにか返す
-		// the session is already in use
+	int fd = info.fd;
 
-	Multiplexer multiplexer( info.fd, gate,
-				 info.session_name, info.session_name_length,
-				 info.password, info.password_length);
-	int ret = multiplexer.run();
+	int gate = listen_gate(gate_path);
+	if( gate < 0 ) {
+		sync_reply(fd, negotiation_reply::ADDRESS_ALREADY_IN_USE,
+				"the session is already in use");
+		close(fd);
+		return 1;
+	}
+
+	int ret;
+	try {
+		Multiplexer multiplexer( info.fd, gate,
+					 info.session_name, info.session_name_length,
+					 info.password, info.password_length);
+		if( sync_reply(fd, negotiation_reply::SUCCESS, "ok") < 0 ) {
+			throw io_error("sync reply failed");
+		}
+std::cerr << "session ok" << std::endl;
+		ret = multiplexer.run();
+		unlink(gate_path);
+	} catch (initialize_error& e) {
+		perror(e.what());
+		sync_reply(fd, negotiation_reply::SERVER_ERROR, e.what());
+		ret = 1;
+	} catch (std::exception& e) {
+		perror(e.what());
+		ret = 1;
+	} catch (...) {
+		perror("unknown error");
+		ret = 1;
+	}
 	unlink(gate_path);
 	return ret;
 }

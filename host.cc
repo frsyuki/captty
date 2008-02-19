@@ -5,7 +5,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "host.h"
-#include "scoped_make_raw.h"
+#include "pty_make_raw.h"
 #include "ptyshell.h"
 #include "unio.h"
 
@@ -34,6 +34,9 @@ HostIMPL::HostIMPL(int server_socket, char lock_code,
 	if( session_name_length > MAX_SESSION_NAME_LENGTH ) {
 		throw initialize_error("session name is too long");
 	}
+	if( session_name_length < MIN_SESSION_NAME_LENGTH ) {
+		throw initialize_error("session name is too short");
+	}
 	if( password_length >  MAX_PASSWORD_LENGTH ) {
 		throw initialize_error("password is too long");
 	}
@@ -52,12 +55,13 @@ int HostIMPL::run(void)
 	// Serverにヘッダを送る
 	negotiation_header_t header;
 	memcpy(header.magic, NEGOTIATION_MAGIC_STRING, NEGOTIATION_MAGIC_STRING_LENGTH);
+	header.protocol_version = PROTOCOL_VERSION;
 
 	// headerにはネットワークバイトオーダーで入れる
 	header.user_name_length    = htons(0);   // user_nameは今のところ空
 	header.session_name_length = htons(m_session_name_length);
 	header.password_length     = htons(m_password_length);
-	if( write_all(server, (char*)&header, sizeof(header)) != sizeof(header) ) {
+	if( write_all(server, &header, sizeof(header)) != sizeof(header) ) {
 		throw initialize_error("failed to send negotiation header");
 	}
 	if( write_all(server, m_session_name, m_session_name_length) != m_session_name_length ) {
@@ -67,23 +71,50 @@ int HostIMPL::run(void)
 		throw initialize_error("failed to send session password");
 	}
 
+	// Serverからヘッダを受け取る
+	negotiation_reply_t reply;
+	if( read_all(server, &reply, sizeof(reply)) != sizeof(reply) ) {
+		throw initialize_error("failed to receive negotiation reply");
+	}
+
+	// ヘッダをチェック
+	{
+		uint16_t msglen = ntohs(reply.message_length);
+		char* msg = (char*)malloc(msglen);
+		if( msg == NULL ) {
+			throw initialize_error("failed to receive negotiation reply");
+		}
+		if( read_all(server, msg, msglen) != msglen ) {
+			free(msg);
+			throw initialize_error("failed to receive negotiation reply");
+		}
+		if( reply.code != negotiation_reply::SUCCESS ) {
+			initialize_error e(msg);
+			free(msg);
+			throw e;
+		}
+	}
+
 	// 新しい仮想端末を確保して、シェルを起動する
 	ptyshell psh(STDIN_FILENO);
 	if( psh.fork(NULL) < 0 ) { throw initialize_error("can't execute shell"); }
 	sh = psh.masterfd();
 
 	// 標準入力をRawモードにする
-	// makerawはPtyChildShellをforkした後
+	// ptyrawはptyshellをforkした後
 	// （forkする前にRawモードにすると子仮想端末までRawモードになってしまう）
-	PtyScopedMakeRaw makeraw(STDIN_FILENO);
+	scoped_pty_make_raw ptyraw(STDIN_FILENO);
 
 	// 監視対象のファイルディスクリプタにO_NONBLOCKをセット
-	if( fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK) < 0 )
-		{ throw initialize_error("failed to set stdinput nonblocking mode"); }
-	if( fcntl(server, F_SETFL, O_NONBLOCK) < 0 )
-		{ throw initialize_error("failed to set server socket nonblocking mode"); }
-	if( fcntl(sh, F_SETFL, O_NONBLOCK) < 0 )
-		{ throw initialize_error("failed to set pty nonblocking mode"); }
+	if( fcntl(STDIN_FILENO, F_SETFL, O_NONBLOCK) < 0 ) {
+		throw initialize_error("failed to set stdinput nonblocking mode");
+	}
+	if( fcntl(server, F_SETFL, O_NONBLOCK) < 0 ) {
+		throw initialize_error("failed to set server socket nonblocking mode");
+	}
+	if( fcntl(sh, F_SETFL, O_NONBLOCK) < 0 ) {
+		throw initialize_error("failed to set pty nonblocking mode");
+	}
 
 	// mp::dispatchに登録
 	using namespace mp::placeholders;
@@ -103,8 +134,21 @@ int HostIMPL::run(void)
 	// 端末のウィンドウサイズを取得しておく
 	get_window_size(STDIN_FILENO, &winsz);
 
+	std::cout << SESSION_START_MESSAGE << std::flush;
+
 	// mp::dispatch::run
-	return mpdp.run();
+	try {
+		int ret = mpdp.run();
+		if( ret != 0 ) {
+			throw io_error("multiplexer broken");
+		}
+		throw std::logic_error("multiplexer error");
+	} catch (io_end_error& e) {
+		ptyraw.finish();
+		std::cout << e.what() << std::endl;
+		std::cout << SESSION_END_MESSAGE << std::endl;
+	}
+	return 0;
 }
 
 

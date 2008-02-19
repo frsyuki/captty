@@ -100,6 +100,7 @@ public:
 		 const std::string& long_name,
 		 Accept ac, bool& notify)
 	{
+		notify = false;
 		if(!short_name.empty()) {
 			map.set(short_name, new Accept(ac), &notify);
 		}

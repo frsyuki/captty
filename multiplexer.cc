@@ -6,7 +6,7 @@
 #include <fcntl.h>
 #include <limits>
 #include "multiplexer.h"
-#include "scoped_make_raw.h"
+#include "pty_make_raw.h"
 #include "unio.h"
 #include "fdtransport.h"
 

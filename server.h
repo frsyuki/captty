@@ -40,7 +40,10 @@ private:
 private:
 	int io_header(mpio& mp, int fd);
 	int io_payload(mpio& mp, int fd, void* buf, size_t just, size_t len);
+	int io_error_reply(mpio& mp, int fd, void* buf, size_t just, size_t len);
 	int io_fork(mpio& mp, int fd, void* buf, size_t just, size_t len);
+	void send_error_reply(int fd, void* buf, uint16_t code, const char* message);
+	void send_error_reply(int fd, void* buf, uint16_t code, const char* message, size_t message_length);
 	void remove_host(int fd);
 	void remove_host(int fd, void* buf);
 };
@@ -67,6 +70,8 @@ public:
 private:
 	int sock;
 private:
+	int sync_reply(int fd, uint16_t code, const char* message);
+	int sync_reply(int fd, uint16_t code, const char* message, size_t message_length);
 	int run_multiplexer(host_info_t& info);
 };
 

@@ -6,7 +6,6 @@
 #include <limits.h>
 #include <sys/wait.h>
 #include "gate.h"
-#include "scoped_make_raw.h"
 #include "fdtransport.h"
 #include "unio.h"
 

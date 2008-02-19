@@ -37,6 +37,21 @@ namespace Accept {
 		String();
 	};
 	
+	struct Character : Acceptable {
+		Character(char& d) : data(d) {}
+		unsigned int operator() (int argc, char* argv[]) {
+			if( argc < 1 ) { throw LackOfArgumentsError("A character is required"); }
+			if( argv[0][0] != '\0' && argv[0][1] == '\0' ) {
+				data = argv[0][0];
+				return 1;
+			} else {
+				throw InvalidArgumentError("One character is expected");
+			}
+		}
+	private:
+		char& data;
+		Character();
+	};
 	
 	template <typename T>
 	struct IMPL::NumericIMPL<T> Numeric(T& n) { return IMPL::NumericIMPL<T>(n); }
@@ -52,6 +67,11 @@ namespace Convert {
 
 	void String(char* arg, std::string& d) {
 		d = arg;
+	}
+
+	void Character(char* arg, char& d) {
+		Accept::Character f(d);
+		f(1, &arg);
 	}
 
 	template <typename T>

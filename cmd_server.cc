@@ -7,51 +7,72 @@
 #include <limits.h>
 #include <signal.h>
 
-int main(int argc, char* argv[])
+void usage(void)
 {
-	struct sockaddr_storage saddr;
-	{
-		using namespace Kazuhiki;
-		Parser kz;
-		kz.on("-l", "", Accept::FlexibleListtenAddress(saddr, 2755));
-		--argc;
-		++argv;
-		kz.break_order(argc, argv);
-	}
+	std::cout
+		<< "\n"
+		<< "* Partty Server (listen host and serve session)\n"
+		<< "   [listen server]$ partty-server  # use default port ["<<Partty::SERVER_DEFAULT_PORT<<"]\n"
+		<< "   [listen server]$ partty-server  <port number>\n"
+		<< "   [listen server]$ partty-server  <listen address>[:<port number>]\n"
+		<< "   [listen server]$ partty-server  <network interface name>[:<port number>]\n"
+		<< "\n"
+		<< std::endl;
+}
 
+int listen_socket(struct sockaddr_storage& saddr)
+{
 	int ssock = socket(saddr.ss_family, SOCK_STREAM, 0);
-	if( ssock < 0 ) { pexit("ssock"); }
+	if( ssock < 0 ) {
+		perror("socket");
+		return -1;
+	}
 	int on = 1;
 	if( setsockopt(ssock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0 ) {
-		pexit("setsockopt"); }
+		perror("setsockopt");
+		return -1;
+	}
 	socklen_t saddr_len = (saddr.ss_family == AF_INET) ?
 		sizeof(struct sockaddr_in) :
 		sizeof(struct sockaddr_in6);
 	if( bind(ssock, (struct sockaddr*)&saddr, saddr_len) < 0 ) {
-		pexit("bind"); }
-	if( listen(ssock, 5) < 0 ) { pexit("listen"); }
+		perror("can't bind the address");
+		return -1;
+	}
+	if( listen(ssock, 5) < 0 ) {
+		perror("listen");
+		return -1;
+	}
+	return ssock;
+}
 
-	/*
-	char gate_path[PATH_MAX + Partty::MAX_SESSION_NAME_LENGTH];
-	ssize_t gate_dir_len = strlen(Partty::GATE_DIR);
-	memcpy(gate_path, Partty::GATE_DIR, gate_dir_len);
-	strlcpy(gate_path + gate_dir_len, session.c_str(), sizeof(gate_path));
-	int gate = listen_gate(gate_path);
-	if( gate < 0 ) { pexit("listen_gate"); }
+int main(int argc, char* argv[])
+{
+	struct sockaddr_storage saddr;
+	try {
+		using namespace Kazuhiki;
+		--argc;  ++argv;  // skip argv[0]
+		if( argc == 0 ) {
+			Convert::AnyAddress(saddr, Partty::SERVER_DEFAULT_PORT);
+		} else if( argc == 1 ) {
+			Convert::FlexibleListtenAddress(argv[0], saddr, Partty::SERVER_DEFAULT_PORT);
+		} else {
+			usage();
+			return 1;
+		}
 
-	int host = accept(ssock, NULL, NULL);
-	if( host < 0 ) { pexit("accept host"); }
-	close(ssock);  // FIXME
+	} catch (Kazuhiki::ArgumentError& e) {
+		std::cerr << "error: " << e.what() << std::endl;
+		usage();
+		return 1;
+	}
 
-	Partty::Server server(
-			host, gate,
-			session.c_str(), session.length(),
-			"", 0);
-	return server.run();
-	*/
+	int ssock = listen_socket(saddr);
+	if( ssock < 0 ) {
+		return 1;
+	}
 
-	{
-		// SIGCHLD
+	{  // Server needs SIGCHLD handler
 		struct sigaction act_child;
 		act_child.sa_handler = SIG_IGN;
 		sigemptyset(&act_child.sa_mask);
@@ -59,10 +80,12 @@ int main(int argc, char* argv[])
 		sigaction(SIGCHLD, &act_child, NULL);
 	}
 
-	Partty::Server server(ssock);
-
-	return server.run();
-
-	// FIXME unlink
+	try {
+		Partty::Server server(ssock);
+		return server.run();
+	} catch (Partty::partty_error& e) {
+		std::cerr << "error: " << e.what() << std::endl;
+		return 1;
+	}
 }
 
