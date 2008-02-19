@@ -70,6 +70,10 @@ namespace Convert {
 		f(1, &arg);
 	}
 
+	template <typename Address>
+	void AnyAddress(Address& a, uint16_t port) {
+		IMPL::ConvertAnyAddress(a, port);
+	}
 }
 
 

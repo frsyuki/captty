@@ -15,6 +15,9 @@
 namespace Partty {
 
 
+// FIXME perror -> ログ
+
+
 Multiplexer::Multiplexer(int host_socket, int gate_socket,
 	const char* session_name, size_t session_name_length,
 	const char* password, size_t password_length) :
@@ -29,17 +32,31 @@ MultiplexerIMPL::MultiplexerIMPL(int host_socket, int gate_socket,
 		m_session_name_length(session_name_length),
 		m_password_length(password_length)
 {
-	// FIXME MAX_SESSION_NAME_LENGTH > session_name_length
-	// FIXME MAX_PASSWORD_LENGTH > password_length
+	if( session_name_length > MAX_SESSION_NAME_LENGTH ) {
+		throw initialize_error("session name is too long");
+	}
+	if( password_length >  MAX_PASSWORD_LENGTH ) {
+		throw initialize_error("password is too long");
+	}
 
 	std::memcpy(m_session_name, session_name, m_session_name_length);
 	std::memcpy(m_password, password, m_password_length);
 
 	// 監視対象のファイルディスクリプタにO_NONBLOCKをセット
-	if( fcntl(host, F_SETFL, O_NONBLOCK) < 0 ) { pexit("set host nonblock"); }
-	if( fcntl(gate, F_SETFL, O_NONBLOCK) < 0 ) { pexit("set gate nonblock"); }
-	if( mpev.add(host, mp::EV_READ) < 0 ) { pexit("mpev.add host"); }
-	if( mpev.add(gate, mp::EV_READ) < 0 ) { pexit("mpev.add gate"); }
+	if( fcntl(host, F_SETFL, O_NONBLOCK) < 0 ) {
+		throw initialize_error("failed to set host socket mode");
+	}
+	if( fcntl(gate, F_SETFL, O_NONBLOCK) < 0 ) {
+		throw initialize_error("failed to set gate socket mode");
+	}
+
+	// mp::eventに登録
+	if( mpev.add(host, mp::EV_READ) < 0 ) {
+		throw initialize_error("can't add host socket to IO multiplexer");
+	}
+	if( mpev.add(gate, mp::EV_READ) < 0 ) {
+		throw initialize_error("can't add gate socket to IO multiplexer");
+	}
 }
 
 
@@ -89,13 +106,14 @@ int MultiplexerIMPL::io_gate(int fd, short event)
 	gate_message_t msg;
 	int guest = recvfd(gate, &msg, sizeof(msg));
 	if( guest < 0 ) {
-		if( errno == EAGAIN || errno == EINTR ) {
-			return 0;
-		} else {
+		if( errno == EAGAIN || errno == EINTR ) { return 0; }
+		else {
 			perror("guest connection failed a");
 			return 0;
 		}
 	}
+	static char trash[1024];
+	read(gate, trash, sizeof(trash));  // FIXME データがあった場合は捨てる？
 	// セッション名とパスワードをチェック
 	if( msg.password.len != m_password_length ||
 	    memcmp(msg.password.str, m_password, m_password_length) != 0 ||
@@ -126,12 +144,8 @@ int MultiplexerIMPL::io_host(int fd, short event)
 	// Hostからread
 	ssize_t len = read(fd, shared_buffer, SHARED_BUFFER_SIZE);
 	if( len < 0 ) {
-		if( errno == EAGAIN || errno == EINTR ) {
-			// do nothing
-		} else {
-			perror("read from host failed");
-			return -1;
-		}
+		if( errno == EAGAIN || errno == EINTR ) { /* do nothing */ }
+		else { throw io_error("host socket is broken"); }
 	} else if( len == 0 ) {
 		perror("read from host ends");
 		return -1;
@@ -161,19 +175,16 @@ int MultiplexerIMPL::io_guest(int fd, short event)
 		// ゲストからread
 		ssize_t len = read(fd, shared_buffer, SHARED_BUFFER_SIZE);
 		if( len < 0 ) {
-			if( errno == EAGAIN || errno == EINTR ) {
-				// do nothing
-			} else {
+			if( errno == EAGAIN || errno == EINTR ) { /* do nothing */ }
+			else {
 				perror("read from guest failed");
 				remove_guest(fd);
 				return 0;
 			}
-		/* FIXME
-		} else if( len == 0 ) {
+		} else if( len == 0 ) {   // FIXME Mac OS X + SCM_RIGHTSはバグあり？
 			perror("read from guest ends");
 			remove_guest(fd);
 			return 0;
-			*/
 		} else {
 			// guest -> host
 			filt_telnetd::buffer_t ibuf;
@@ -182,9 +193,9 @@ int MultiplexerIMPL::io_guest(int fd, short event)
 				return 0;
 			}
 			// FIXME  write_all? ブロッキングモードにする？
+			// FIXME Hostが切断されたのかエラーが発生したのか区別できない
 			if( write_all(host, ibuf.buf, ibuf.len) != ibuf.len ) {
-				perror("write to host failed");
-				return -1;
+				throw io_error("host socket is broken");
 			}
 		}
 	}
@@ -194,9 +205,8 @@ int MultiplexerIMPL::io_guest(int fd, short event)
 		ssize_t len = write(fd, srv.obuffer, srv.olength);
 		//if( srv.olength == 0 ) { return 0; }  // olengthは0の可能性がある？
 		if( len < 0 ) {
-			if( errno == EAGAIN || errno == EINTR ) {
-				// do nothing
-			} else {
+			if( errno == EAGAIN || errno == EINTR ) { /* do nothing */ }
+			else {
 				perror("write to guest failed");
 				remove_guest(fd);
 				return 0;
@@ -275,6 +285,7 @@ int MultiplexerIMPL::guest_try_write(int fd, filt_telnetd& srv)
 		// バッファに残して書き込み待ちにする
 		srv.oconsumed(wlen);
 		if( mpev.modify(fd, mp::EV_READ, mp::EV_READ | mp::EV_WRITE) < 0 ) {
+			perror("mpev.modify");
 			return -1;
 		}
 	} else {

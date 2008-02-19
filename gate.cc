@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <limits.h>
+#include <sys/wait.h>
 #include "gate.h"
 #include "scoped_make_raw.h"
 #include "fdtransport.h"
@@ -17,8 +18,10 @@ namespace Partty {
 Gate::Gate(int listen_socket) : impl(new GateIMPL(listen_socket)) {}
 GateIMPL::GateIMPL(int listen_socket) : socket(listen_socket)
 {
-	// FIXME strlen(GATE_DIR) > PATH_MAX
 	gate_dir_len = strlen(GATE_DIR);
+	if( gate_dir_len > PATH_MAX ) {
+		throw initialize_error("gate directory path is too long");
+	}
 	memcpy(gate_path, GATE_DIR, gate_dir_len);
 	// この時点ではgate_pathにはNULL終端が付いていない
 }
@@ -111,6 +114,7 @@ int GateIMPL::accept_guest(void)
 	std::cout << msg.password.str << std::endl;
 
 	if( sendfd(gate, guest, &msg, sizeof(msg)) < 0 ) {
+		perror("sendfd");
 		return E_SENDFD;
 	}
 	close(guest);

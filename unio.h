@@ -28,7 +28,9 @@ inline int listen_path(const char* path)
 	}
 	memset(&gate_addr, 0, sizeof(gate_addr));
 	gate_addr.sun_family = AF_UNIX;
-	strlcpy(gate_addr.sun_path, path, sizeof(gate_addr.sun_path));
+	strncpy(gate_addr.sun_path, path, sizeof(gate_addr.sun_path)-1);
+	gate_addr.sun_path[sizeof(gate_addr.sun_path)-1] = '\0';
+	//strlcpy(gate_addr.sun_path, path, sizeof(gate_addr.sun_path));
 	if( bind(sock, (struct sockaddr*)&gate_addr, sizeof(gate_addr)) < 0 ) {
 		return -1;
 	}
@@ -72,7 +74,9 @@ inline int connect_path(const char* path)
 	}
 	memset(&gate_addr, 0, sizeof(gate_addr));
 	gate_addr.sun_family = AF_UNIX;
-	strlcpy(gate_addr.sun_path, path, sizeof(gate_addr.sun_path));
+	strncpy(gate_addr.sun_path, path, sizeof(gate_addr.sun_path)-1);
+	gate_addr.sun_path[sizeof(gate_addr.sun_path)-1] = '\0';
+	//strlcpy(gate_addr.sun_path, path, sizeof(gate_addr.sun_path));
 	if ( connect(sock, (struct sockaddr*)&gate_addr, sizeof(gate_addr)) < 0 ) {
 		return -1;
 	}

@@ -11,6 +11,7 @@
 #include "fdtransport.h"
 
 namespace Partty {
+void handler(int) { perror("hoge"); exit(1); }
 
 
 Server::Server(int listen_socket) :
@@ -26,11 +27,12 @@ ServerIMPL::~ServerIMPL()
 
 Lobby::Lobby(int listen_socket) : sock(listen_socket), max_fd(-1)
 {
-	if( fcntl(sock, F_SETFL, O_NONBLOCK) < 0 ) { pexit("set sock nonblock");  }
+	if( fcntl(sock, F_SETFL, O_NONBLOCK) < 0 )
+		{ throw initialize_error("failed to set listen socket nonblock mode"); }
 	using namespace mp::placeholders;
 	if( mp::ios::ios_accept(mp, sock,
 			mp::bind(&Lobby::io_header, this, _1, _2) ) < 0 ) {
-		pexit("ios_accept");
+		throw initialize_error("can't add listen socket to IO multiplexer");
 	}
 }
 
@@ -77,6 +79,7 @@ void ScopedLobby::forked_destroy(int fd) {
 
 void Lobby::forked_destroy(int fd)
 {
+	// FIXME
 	for(int i = 0; i <= max_fd; ++i) {
 		if( i != fd ) {
 			close(i);
@@ -135,6 +138,7 @@ perror("header reached");
 	    header->session_name_length > MAX_SESSION_NAME_LENGTH ||
 	    header->password_length     > MAX_PASSWORD_LENGTH     ||
 	    header->session_name_length == 0 ) {
+		// FIXME Hostにメッセージを返す？
 		remove_host(fd, buf);
 		return 0;
 	}
@@ -219,8 +223,7 @@ int ServerIMPL::run_multiplexer(host_info_t& info)
 
 	int gate = listen_gate(gate_path);
 	if( gate < 0 ) { pexit("listen_gate"); }  // FIXME hostになにか返す
-
-perror("multiplexer");
+		// the session is already in use
 
 	Multiplexer multiplexer( info.fd, gate,
 				 info.session_name, info.session_name_length,

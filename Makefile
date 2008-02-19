@@ -20,7 +20,7 @@ connect: connect.c
 
 clean:
 	$(RM) emtelnet.o ptyshell.o
-	$(RM) server.o host.o gate.o
+	$(RM) server.o multiplexer.o host.o gate.o
 	$(RM) cmd_host.o cmd_server.o cmd_gate.o
 
 

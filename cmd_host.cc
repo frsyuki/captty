@@ -42,8 +42,11 @@ int main(int argc, char* argv[])
 		Parser kz;
 		kz.on("-v", "--verbose", Accept::Boolean(opt.verbose));
 		kz.break_parse(argc, argv);
-		if( argc < 1 ) { throw ArgumentError(""); }
-		Convert::FlexibleActiveHost(argv[0], saddr, 2755);
+		if( argc == 1 ) {
+			Convert::FlexibleActiveHost(argv[0], saddr, 2755);
+		} else {
+			throw ArgumentError("");
+		}
 
 	} catch (Kazuhiki::ArgumentError& e) {
 		std::cout << e.what() << std::endl;
@@ -53,11 +56,15 @@ int main(int argc, char* argv[])
 
 	int ssock = socket(saddr.ss_family, SOCK_STREAM, 0);
 	if( ssock < 0 ) { pexit("socket"); }
-	if( connect(ssock, (struct sockaddr*)&saddr, saddr.ss_len) < 0 ) {
+	socklen_t saddr_len = (saddr.ss_family == AF_INET) ?
+		sizeof(struct sockaddr_in) :
+		sizeof(struct sockaddr_in6);
+	if( connect(ssock, (struct sockaddr*)&saddr, saddr_len) < 0 ) {
 		pexit("bind");
 	}
 
-	Partty::Host host(ssock, "test", 4, "", 0);
+	// lock_code = c - 'a' + 1;
+	Partty::Host host(ssock, 1, "test", 4, "", 0);
 	return host.run();
 }
 

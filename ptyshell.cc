@@ -1,9 +1,11 @@
 #include "ptyshell.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <termios.h>
 #include <sys/ioctl.h>
 #include <util.h>
+// FIXME Linuxではutil.hの代わりにpty.hで-lutil
 
 namespace Partty {
 
@@ -53,7 +55,8 @@ int ptyshell::execute_shell(char* cmd[])
 {
 	if( cmd == NULL ) {
 		char* shell = getenv("SHELL");
-		if( shell == NULL ) { shell = "/bin/sh"; }
+		char fallback_shell[] = "/bin/sh";
+		if( shell == NULL ) { shell = fallback_shell; }
 		char* name = strrchr(shell, '/');
 		if( name == NULL ) { name = shell; } else { name += 1; }
 		execl(shell, name, "-i", NULL);

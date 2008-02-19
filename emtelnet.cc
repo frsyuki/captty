@@ -105,6 +105,7 @@ void emtelnet::send_will(byte cmd)
 void emtelnet::send_wont(byte cmd)
 {
 	owrite(IAC, WONT, cmd);
+	m_do_waiting.set(cmd);
 }
 
 void emtelnet::send_do(byte cmd)
@@ -116,6 +117,7 @@ void emtelnet::send_do(byte cmd)
 void emtelnet::send_dont(byte cmd)
 {
 	owrite(IAC, DONT, cmd);
+	m_will_waiting.set(cmd);
 }
 
 void emtelnet::owrite(byte c)
@@ -262,7 +264,7 @@ void emtelnet::istate_WILL(byte c)
 {
 	//fprintf(stderr, "will %u\n", c);
 	if( m_will_waiting.test(c) ) {
-		// do is sent and receive will
+		// do (or maybe dont) is sent and receive will
 		// the partner can use the option
 		m_will_waiting.reset(c);
 		if( m_partner_option_handler[(size_t)c] ) {
@@ -289,7 +291,7 @@ void emtelnet::istate_WONT(byte c)
 {
 	//fprintf(stderr, "wont %u\n", c);
 	if( m_will_waiting.test(c) ) {
-		// do is send and receive wont
+		// do or dont is sent and receive wont
 		// the partner can't use the option
 		m_will_waiting.reset(c);
 	} else {
@@ -308,7 +310,7 @@ void emtelnet::istate_DO(byte c)
 {
 	//fprintf(stderr, "do %u\n", c);
 	if( m_do_waiting.test(c) ) {
-		// will is sent and receive do
+		// will (or maybe wont) is sent and receive do
 		// I can use the option
 		m_do_waiting.reset(c);
 		if( m_my_option_handler[(size_t)c] ) {

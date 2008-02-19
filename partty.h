@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdexcept>
 
 #ifndef PARTTY_GATE_DIR
 #define PARTTY_GATE_DIR "./var/"
@@ -103,7 +104,7 @@ private:
 class HostIMPL;
 class Host {
 public:
-	Host(int server_socket,
+	Host(int server_socket, char lock_code,
 		const char* session_name, size_t session_name_length,
 		const char* password, size_t password_length);
 	~Host();
@@ -129,6 +130,26 @@ private:
 	Gate(const Gate&);
 };
 
+
+struct partty_error : public std::runtime_error {
+	partty_error(const std::string& message) : runtime_error(message) {}
+	virtual ~partty_error() throw() {}
+};
+
+struct initialize_error : public partty_error {
+	initialize_error(const std::string& message) : partty_error(message) {}
+	virtual ~initialize_error() throw() {}
+};
+
+struct io_error : public partty_error {
+	io_error(const std::string& message) : partty_error(message) {}
+	virtual ~io_error() throw() {}
+};
+
+struct io_end_error : public io_error {
+	io_end_error(const std::string& message) : io_error(message) {}
+	virtual ~io_end_error() throw() {}
+};
 
 
 }  // namespace Partty

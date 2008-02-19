@@ -24,7 +24,10 @@ int main(int argc, char* argv[])
 	int on = 1;
 	if( setsockopt(ssock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0 ) {
 		pexit("setsockopt"); }
-	if( bind(ssock, (struct sockaddr*)&saddr, saddr.ss_len) < 0 ) {
+	socklen_t saddr_len = (saddr.ss_family == AF_INET) ?
+		sizeof(struct sockaddr_in) :
+		sizeof(struct sockaddr_in6);
+	if( bind(ssock, (struct sockaddr*)&saddr, saddr_len) < 0 ) {
 		pexit("bind"); }
 	if( listen(ssock, 5) < 0 ) { pexit("listen"); }
 

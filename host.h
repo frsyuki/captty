@@ -7,7 +7,7 @@ namespace Partty {
 
 class HostIMPL {
 public:
-	HostIMPL(int server_socket,
+	HostIMPL(int server_socket, char lock_code,
 		const char* session_name, size_t session_name_length,
 		const char* password, size_t password_length);
 	~HostIMPL();
@@ -16,6 +16,9 @@ private:
 	int sh;
 	int host;
 	int server;
+
+	char m_lock_code;
+	bool m_locking;
 
 	char m_session_name[MAX_SESSION_NAME_LENGTH];
 	char m_password[MAX_PASSWORD_LENGTH];
