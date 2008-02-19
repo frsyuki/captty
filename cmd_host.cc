@@ -1,7 +1,7 @@
 #include "partty.h"
 #include "unio.h"
-#include "kazuhiki/basic.h"
-#include "kazuhiki/network.h"
+#include <kazuhiki/basic.h>
+#include <kazuhiki/network.h>
 #include <iostream>
 #include <stdio.h>
 

@@ -34,8 +34,10 @@ int GateIMPL::run(void)
 	pid_t child;
 	int status;
 	while(1) {
+	// FIXME シグナルハンドラ
 		if( (child = fork()) < 0 ) {
-			pexit("fork()");
+			perror("failed to fork");
+			throw partty_error("failed to fork");
 		} else if( child == 0 ) {
 			// child
 			exit(accept_guest());

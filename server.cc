@@ -54,14 +54,14 @@ int ServerIMPL::run(void)
 	// FIXME シグナルハンドラ
 		int ret = lobby.next(info);
 		if( ret < 0 ) {
-			// FIXME
-			pexit("lobby.next");
+			perror("multiplexer is broken");
+			throw io_error("multiplexer is borken");
 		}
 		pid = fork();
 		if( pid < 0 ) {
 			// error
-			// FIXME
-			pexit("lobby.next");
+			perror("failed to fork");
+			throw partty_error("failed to fork");
 		} else if( pid == 0 ) {
 			// child
 			lobby.forked_destroy(info.fd);

@@ -1,7 +1,7 @@
 #include "partty.h"
 #include "unio.h"
 #include "fdtransport.h"
-#include "kazuhiki/network.h"
+#include <kazuhiki/network.h>
 #include <string.h>
 #include <string>
 #include <limits.h>

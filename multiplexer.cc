@@ -84,6 +84,7 @@ int MultiplexerIMPL::run(void)
 	int fd;
 	short event;
 	while(1) {
+	// FIXME シグナルハンドラ
 		while( mpev.next(&fd, &event) ) {
 			if( fd == host ) {
 				if( io_host(fd, event) < 0 ) { return 0; }
@@ -131,7 +132,7 @@ int MultiplexerIMPL::io_gate(int fd, short event)
 		close(guest);
 		return 0;
 	}
-	guest_set.set(guest, new filt_telnetd);
+	guest_set.set(guest);
 	// 書き込み待ちバッファにPARTTY_SERVER_WELCOME_MESSAGEを加える
 	guest_set.data(guest).send(PARTTY_SERVER_WELCOME_MESSAGE, strlen(PARTTY_SERVER_WELCOME_MESSAGE), NULL);
 	num_guest++;

@@ -1,6 +1,6 @@
 #include <mp/event.h>
+#include <mp/sparse_array.h>
 #include "emtelnet.h"
-#include "sparse_array.h"
 #include "partty.h"
 
 namespace Partty {
@@ -104,7 +104,7 @@ private:
 	typedef mp::event<void> mpevent;
 	mpevent mpev;
 
-	typedef sparse_array<filt_telnetd> guest_set_t;
+	typedef mp::sparse_array<filt_telnetd> guest_set_t;
 	guest_set_t guest_set;
 	int num_guest;
 

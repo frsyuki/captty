@@ -1,6 +1,6 @@
 #include "partty.h"
 #include "unio.h"
-#include "kazuhiki/network.h"
+#include <kazuhiki/network.h>
 
 void usage(void)
 {
