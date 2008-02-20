@@ -14,8 +14,29 @@
 namespace Partty {
 
 
+phrase_telnetd::phrase_telnetd() : emtelnet((void*)this) {
+	// use these options
+	// force clinet line mode
+	//set_my_option_handler( emtelnet::OPT_SGA,
+	//		phrase_telnetd::pass_through_handler );
+	set_my_option_handler( emtelnet::OPT_BINARY,
+			phrase_telnetd::pass_through_handler );
+
+	// supported partner options
+	set_partner_option_handler( emtelnet::OPT_ECHO,
+			phrase_telnetd::pass_through_handler );
+	set_partner_option_handler( emtelnet::OPT_LINEMODE,
+			phrase_telnetd::pass_through_handler );
+	set_partner_option_handler( emtelnet::OPT_BINARY,
+			phrase_telnetd::pass_through_handler );
+
+	//send_will(emtelnet::OPT_SGA);
+}
+
+
 Gate::Gate(int listen_socket) : impl(new GateIMPL(listen_socket)) {}
-GateIMPL::GateIMPL(int listen_socket) : socket(listen_socket)
+GateIMPL::GateIMPL(int listen_socket) :
+		socket(listen_socket), m_end(0)
 {
 	gate_dir_len = strlen(GATE_DIR);
 	if( gate_dir_len > PATH_MAX ) {
@@ -31,26 +52,38 @@ GateIMPL::~GateIMPL() {}
 int Gate::run(void) { return impl->run(); }
 int GateIMPL::run(void)
 {
-	pid_t child;
+	pid_t pid;
 	int status;
-	while(1) {
-	// FIXME シグナルハンドラ
-		if( (child = fork()) < 0 ) {
-			perror("failed to fork");
-			throw partty_error("failed to fork");
-		} else if( child == 0 ) {
-			// child
-			exit(accept_guest());
+	unsigned int numchild = 0;
+	while(!m_end) {
+		while(numchild < 5) {
+			if( (pid = fork()) < 0 ) {
+				perror("failed to fork");
+				throw partty_error("failed to fork");
+			} else if( pid == 0 ) {
+				// pid
+				exit(accept_guest());
+			}
 		}
-
 		// parent
-		// FIXME パスワードの入力待ち中に他のクライアントが接続できない
-		waitpid(child, &status, 0);
+		pid = wait(&status);
+		if( pid < 0 ) { break; }
 		int e = WEXITSTATUS(status);
 		if( e == E_ACCEPT || e == E_FINISH ) {
-			exit(e);
+			break;
 		}
 	}
+
+	kill(0, SIGTERM);
+	while(numchild > 0) {
+		pid = wait(&status);
+		if( pid < 0 ) {
+			perror("wait");
+			return -1;
+		}
+		--numchild;
+	}
+	perror("end");
 
 	return 0;
 }

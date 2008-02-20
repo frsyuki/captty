@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include "host.h"
 #include "pty_make_raw.h"

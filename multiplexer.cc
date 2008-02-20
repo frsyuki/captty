@@ -17,6 +17,31 @@ namespace Partty {
 
 // FIXME perror -> ログ
 
+filt_telnetd::filt_telnetd() : emtelnet((void*)this)
+{
+	// use these options
+	set_my_option_handler( emtelnet::OPT_SGA,
+			filt_telnetd::pass_through_handler );
+	set_my_option_handler( emtelnet::OPT_ECHO,
+			filt_telnetd::pass_through_handler );
+	set_my_option_handler( emtelnet::OPT_BINARY,
+			filt_telnetd::pass_through_handler );
+
+	// supported partner options
+	set_partner_option_handler( emtelnet::OPT_BINARY,
+			filt_telnetd::pass_through_handler );
+
+	// prevent line mode
+	send_will(emtelnet::OPT_SGA);
+	send_will(emtelnet::OPT_ECHO);
+	send_dont(emtelnet::OPT_ECHO);
+	send_dont(emtelnet::OPT_LINEMODE);
+
+	// enable multibyte characters
+	send_will(emtelnet::OPT_BINARY);
+	send_do(emtelnet::OPT_BINARY);
+}
+
 
 Multiplexer::Multiplexer(int host_socket, int gate_socket,
 	const char* session_name, size_t session_name_length,

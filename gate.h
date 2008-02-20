@@ -8,24 +8,7 @@ class phrase_telnetd : public emtelnet {
 private:
 	static void pass_through_handler(char cmd, bool sw, emtelnet& base) {}
 public:
-	phrase_telnetd() : emtelnet((void*)this) {
-		// use these options
-		// force clinet line mode
-		//set_my_option_handler( emtelnet::OPT_SGA,
-		//		phrase_telnetd::pass_through_handler );
-		set_my_option_handler( emtelnet::OPT_BINARY,
-				phrase_telnetd::pass_through_handler );
-
-		// supported partner options
-		set_partner_option_handler( emtelnet::OPT_ECHO,
-				phrase_telnetd::pass_through_handler );
-		set_partner_option_handler( emtelnet::OPT_LINEMODE,
-				phrase_telnetd::pass_through_handler );
-		set_partner_option_handler( emtelnet::OPT_BINARY,
-				phrase_telnetd::pass_through_handler );
-
-		//send_will(emtelnet::OPT_SGA);
-	}
+	phrase_telnetd();
 private:
 	phrase_telnetd(const phrase_telnetd&);
 };
@@ -36,6 +19,7 @@ public:
 	GateIMPL(int listen_socket);
 	~GateIMPL();
 	int run(void);
+	void signal_end(void);
 private:
 	int accept_guest(void);
 	static ssize_t write_message(phrase_telnetd& td, int guest, const char* buf, size_t count);
@@ -44,6 +28,7 @@ private:
 	int socket;
 	char gate_path[PATH_MAX + MAX_SESSION_NAME_LENGTH];
 	size_t gate_dir_len;
+	sig_atomic_t m_end;
 private:
 	GateIMPL();
 	GateIMPL(const GateIMPL&);

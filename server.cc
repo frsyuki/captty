@@ -6,12 +6,12 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <arpa/inet.h>
 #include <fcntl.h>
 #include "unio.h"
 #include "fdtransport.h"
 
 namespace Partty {
-void handler(int) { perror("hoge"); exit(1); }
 
 
 Server::Server(int listen_socket) :

@@ -16,11 +16,7 @@ public:
 		tcsetattr(m_fd, TCSAFLUSH, &raw);
 	}
 	~scoped_pty_make_raw() {
-		if(m_fd >= 0) {
-			// XXX: TCSANOW?
-			tcsetattr(m_fd, TCSADRAIN, &m_orig);
-			write(m_fd, "\n", 1);
-		}
+		finish();
 	}
 	void finish(void) {
 		if(m_fd >= 0) {
