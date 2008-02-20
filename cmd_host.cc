@@ -21,7 +21,7 @@ void usage(void)
 		<< "   options:\n"
 		<< "     -s <session name>      session name\n"
 		<< "     -p <password>          password to join the session\n"
-		<< "     -c <lock character>    control key to lock guest operation [a]\n"
+		<< "     -c <lock character>    control key to lock guest operation []]\n"
 		<< "\n"
 		<< std::endl;
 }
@@ -30,7 +30,7 @@ int main(int argc, char* argv[])
 {
 	std::string session_name;
 	std::string password;
-	char lock_char = '0';
+	char lock_char = ']';
 	bool session_name_set;
 	bool password_set;
 	bool lock_char_set;
@@ -50,7 +50,10 @@ int main(int argc, char* argv[])
 		}
 		Convert::FlexibleActiveHost(argv[0], saddr, Partty::SERVER_DEFAULT_PORT);
 
-		if( lock_char_set && lock_char < 'a' ) {
+		if( lock_char < 'a' ) {
+			lock_char += 32;  // shift
+		}
+		if( lock_char < 'a' ) {
 			throw ArgumentError("Invalid lock character");
 		}
 

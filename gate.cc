@@ -64,10 +64,15 @@ int GateIMPL::run(void)
 				// pid
 				exit(accept_guest());
 			}
+			++numchild;
 		}
 		// parent
 		pid = wait(&status);
-		if( pid < 0 ) { break; }
+		if( pid < 0 ) {
+			perror("wait");
+			break;
+		}
+		--numchild;
 		int e = WEXITSTATUS(status);
 		if( e == E_ACCEPT || e == E_FINISH ) {
 			break;
@@ -141,11 +146,6 @@ int GateIMPL::accept_guest(void)
 	std::cout << gate_path << std::endl;
 	int gate = connect_gate(gate_path);
 	if( gate < 0 ) { return E_SESSION_NAME; }
-
-	std::cout << msg.session_name.len << std::endl;
-	std::cout << msg.session_name.str << std::endl;
-	std::cout << msg.password.len << std::endl;
-	std::cout << msg.password.str << std::endl;
 
 	if( sendfd(gate, guest, &msg, sizeof(msg)) < 0 ) {
 		perror("sendfd");

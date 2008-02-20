@@ -1,4 +1,4 @@
-CFLAGS = -Wall -I. -g
+CFLAGS = -Wall -I. -g -DMP_SYSTEM=select
 
 .PHONY: all
 all: partty-server partty-host partty-gate partty-scale
