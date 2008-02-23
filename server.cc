@@ -8,7 +8,7 @@
 #include <sys/ioctl.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
-#include "unio.h"
+#include "uniext.h"
 #include "fdtransport.h"
 
 namespace Partty {
@@ -122,7 +122,6 @@ perror("waiting header");
 
 int Lobby::io_payload(mpio& mp, int fd, void* buf, size_t just, size_t len)
 {
-perror("header reached");
 	if( len != just ) {
 		remove_host(fd, buf);
 		return 0;
@@ -130,37 +129,43 @@ perror("header reached");
 
 	negotiation_header_t* header = reinterpret_cast<negotiation_header_t*>(buf);
 	if( memcmp(NEGOTIATION_MAGIC_STRING, header->magic, NEGOTIATION_MAGIC_STRING_LENGTH) != 0 ) {
-		send_error_reply(fd, buf, negotiation_reply::PROTCOL_MISMATCH, "protocol mismatch");
+		send_error_reply(fd, buf, negotiation_reply::PROTOCOL_MISMATCH, "protocol mismatch");
 		return 0;
 	}
 
 	// ここでエンディアンを直す
 	header->user_name_length = ntohs(header->user_name_length);
 	header->session_name_length = ntohs(header->session_name_length);
-	header->password_length = ntohs(header->password_length);
+	header->writable_password_length = ntohs(header->writable_password_length);
+	header->readonly_password_length = ntohs(header->readonly_password_length);
 
-	if( header->user_name_length    > MAX_USER_NAME_LENGTH    ||
-	    header->session_name_length > MAX_SESSION_NAME_LENGTH ||
-	    header->session_name_length < MIN_SESSION_NAME_LENGTH ||
-	    header->password_length     > MAX_PASSWORD_LENGTH     ||
+	if( header->protocol_version != PROTOCOL_VERSION ) {
+		send_error_reply(fd, buf, negotiation_reply::PROTOCOL_MISMATCH, "protocol version mismatch");
+		return 0;
+	}
+
+	if( header->user_name_length    > MAX_USER_NAME_LENGTH     ||
+	    header->session_name_length > MAX_SESSION_NAME_LENGTH  ||
+	    header->session_name_length < MIN_SESSION_NAME_LENGTH  ||
+	    header->writable_password_length > MAX_PASSWORD_LENGTH ||
+	    header->readonly_password_length > MAX_PASSWORD_LENGTH ||
 	    header->session_name_length == 0 ) {
 		send_error_reply(fd, buf, negotiation_reply::AUTHENTICATION_FAILED, "authentication failed");
 		return 0;
 	}
 
-perror("header ok");
 	using namespace mp::placeholders;
 	if( mp::ios::ios_read_just(mp, fd, (char*)buf + sizeof(negotiation_header_t),
 			header->user_name_length +
+				header->user_name_length +
 				header->session_name_length +
-				header->password_length,
+				header->writable_password_length +
+				header->readonly_password_length,
 			mp::bind(&Lobby::io_fork, this, _1, _2, _3, _4, _5)) < 0 ) {
 		send_error_reply(fd, buf, negotiation_reply::SERVER_ERROR, "multiplexer is broken");
 		return 0;
 	}
 
-std::cerr << "waiting length " << (header->user_name_length + header->session_name_length + header->password_length)
-				<< std::endl;
 	return 0;
 }
 
@@ -198,7 +203,6 @@ void Lobby::send_error_reply(int fd, void* buf, uint16_t code, const char* messa
 
 int Lobby::io_fork(mpio& mp, int fd, void* payload, size_t just, size_t len)
 {
-perror("payload reached");
 	void* buf = (void*)(((char*)payload) - sizeof(negotiation_header_t));
 	if( len != just ) {
 		remove_host(fd, buf);
@@ -209,24 +213,34 @@ perror("payload reached");
 
 	next_host->fd = fd;
 
-	next_host->user_name_length    = header->user_name_length;
+	next_host->user_name_length = header->user_name_length;
 	next_host->session_name_length = header->session_name_length;
-	next_host->password_length     = header->password_length;
+	next_host->writable_password_length = header->writable_password_length;
+	next_host->readonly_password_length = header->readonly_password_length;
 
 	std::memcpy( next_host->user_name,
 		     payload,
 		     header->user_name_length);
+	next_host->user_name[header->user_name_length] = '\0';
 
 	std::memcpy( next_host->session_name,
 		     (char*)payload + next_host->user_name_length,
 		     header->session_name_length);
+	next_host->session_name[header->session_name_length] = '\0';
 
-	std::memcpy( next_host->password,
+	std::memcpy( next_host->writable_password,
 		     (char*)payload + next_host->user_name_length
 				    + next_host->session_name_length,
-		     header->password_length);
+		     header->writable_password_length);
+	next_host->writable_password[header->writable_password_length] = '\0';
 
-perror("payload ok");
+	std::memcpy( next_host->readonly_password,
+		     (char*)payload + next_host->user_name_length
+				    + next_host->session_name_length
+				    + next_host->readonly_password_length,
+		     header->readonly_password_length);
+	next_host->readonly_password[header->readonly_password_length] = '\0';
+
 	mp.remove(fd);
 	mp.pool.free(buf);
 
@@ -282,21 +296,32 @@ int ServerIMPL::run_multiplexer(host_info_t& info)
 
 	int gate = listen_gate(gate_path);
 	if( gate < 0 ) {
-		sync_reply(fd, negotiation_reply::ADDRESS_ALREADY_IN_USE,
-				"the session is already in use");
-		close(fd);
-		return 1;
+		int testfd = connect_gate(gate_path);
+		if( testfd < 0 ) {
+			unlink(gate_path);
+			gate = listen_gate(gate_path);
+			if( gate < 0 ) {
+				sync_reply(fd, negotiation_reply::SESSION_UNAVAILABLE,
+						"the session is can't be used");
+				close(fd);
+				return 1;
+			}
+		} else {
+			close(testfd);
+			sync_reply(fd, negotiation_reply::SESSION_UNAVAILABLE,
+					"the session is already in use");
+			close(fd);
+			return 1;
+		}
 	}
 
 	int ret;
 	try {
-		Multiplexer multiplexer( info.fd, gate,
-					 info.session_name, info.session_name_length,
-					 info.password, info.password_length);
+		Multiplexer multiplexer(info.fd, gate, session_info_ref_t(info));
 		if( sync_reply(fd, negotiation_reply::SUCCESS, "ok") < 0 ) {
 			throw io_error("sync reply failed");
 		}
-std::cerr << "session ok" << std::endl;
+		std::cerr << "session " << info.session_name << " by " << info.user_name << std::endl;
 		ret = multiplexer.run();
 		unlink(gate_path);
 	} catch (initialize_error& e) {

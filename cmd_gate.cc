@@ -1,5 +1,5 @@
 #include "partty.h"
-#include "unio.h"
+#include "uniext.h"
 #include <kazuhiki/network.h>
 
 void usage(void)

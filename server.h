@@ -4,14 +4,10 @@
 namespace Partty {
 
 
-struct host_info_t {
+struct host_info_t : session_info_t {
 	int fd;
-	size_t user_name_length;
-	size_t session_name_length;
-	size_t password_length;
+	uint16_t user_name_length;
 	char user_name[MAX_USER_NAME_LENGTH];
-	char session_name[MAX_PASSWORD_LENGTH];
-	char password[MAX_PASSWORD_LENGTH];
 };
 
 class Lobby {

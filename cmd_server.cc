@@ -1,5 +1,5 @@
 #include "partty.h"
-#include "unio.h"
+#include "uniext.h"
 #include "fdtransport.h"
 #include <kazuhiki/network.h>
 #include <string.h>
@@ -46,8 +46,11 @@ int listen_socket(struct sockaddr_storage& saddr)
 	return ssock;
 }
 
-int main(int argc, char* argv[])
+int main(int argc, char* argv[], char* envp[])
 {
+	// Server needs initprocname
+	Partty::initprocname(argc, argv, envp);
+
 	struct sockaddr_storage saddr;
 	try {
 		using namespace Kazuhiki;

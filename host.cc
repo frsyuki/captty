@@ -8,7 +8,7 @@
 #include "host.h"
 #include "pty_make_raw.h"
 #include "ptyshell.h"
-#include "unio.h"
+#include "uniext.h"
 
 #include <iostream>
 
@@ -18,32 +18,15 @@ namespace Partty {
 // FIXME Serverとのコネクションが切断したら再接続する？
 
 Host::Host(int server_socket, char lock_code,
-	const char* session_name, size_t session_name_length,
-	const char* password, size_t password_length ) :
-		impl(new HostIMPL(server_socket, lock_code,
-			session_name, session_name_length,
-			password, password_length )) {}
+		const session_info_ref_t& info) :
+		impl( new HostIMPL(server_socket, lock_code,
+					info) ) {}
 
 HostIMPL::HostIMPL(int server_socket, char lock_code,
-	const char* session_name, size_t session_name_length,
-	const char* password, size_t password_length ) :
-		server(server_socket),
-		m_lock_code(lock_code), m_locking(false),
-		m_session_name_length(session_name_length),
-		m_password_length(password_length)
-{
-	if( session_name_length > MAX_SESSION_NAME_LENGTH ) {
-		throw initialize_error("session name is too long");
-	}
-	if( session_name_length < MIN_SESSION_NAME_LENGTH ) {
-		throw initialize_error("session name is too short");
-	}
-	if( password_length >  MAX_PASSWORD_LENGTH ) {
-		throw initialize_error("password is too long");
-	}
-	std::memcpy(m_session_name, session_name, m_session_name_length);
-	std::memcpy(m_password, password, m_password_length);
-}
+		const session_info_ref_t& info) :
+	server(server_socket),
+	m_lock_code(lock_code), m_locking(false),
+	m_info(info) {}
 
 
 Host::~Host() { delete impl; }
@@ -55,21 +38,35 @@ int HostIMPL::run(void)
 {
 	// Serverにヘッダを送る
 	negotiation_header_t header;
+
+	// negotiation magic string
 	memcpy(header.magic, NEGOTIATION_MAGIC_STRING, NEGOTIATION_MAGIC_STRING_LENGTH);
 	header.protocol_version = PROTOCOL_VERSION;
 
 	// headerにはネットワークバイトオーダーで入れる
 	header.user_name_length    = htons(0);   // user_nameは今のところ空
-	header.session_name_length = htons(m_session_name_length);
-	header.password_length     = htons(m_password_length);
+	header.session_name_length = htons(m_info.session_name_length);
+	header.writable_password_length = htons(m_info.writable_password_length);
+	header.readonly_password_length = htons(m_info.readonly_password_length);
+	// header
 	if( write_all(server, &header, sizeof(header)) != sizeof(header) ) {
 		throw initialize_error("failed to send negotiation header");
 	}
-	if( write_all(server, m_session_name, m_session_name_length) != m_session_name_length ) {
+	// user_name
+	if( write_all(server, &m_info.user_name, m_info.user_name_length) != m_info.user_name_length ) {
+		throw initialize_error("failed to send user name");
+	}
+	// session_name
+	if( write_all(server, m_info.session_name, m_info.session_name_length) != m_info.session_name_length ) {
 		throw initialize_error("failed to send session name");
 	}
-	if( write_all(server, m_password, m_password_length) != m_password_length ) {
-		throw initialize_error("failed to send session password");
+	// writable_password
+	if( write_all(server, m_info.writable_password, m_info.writable_password_length) != m_info.writable_password_length ) {
+		throw initialize_error("failed to send operation password");
+	}
+	// readonly_password
+	if( write_all(server, m_info.readonly_password, m_info.readonly_password_length) != m_info.readonly_password_length ) {
+		throw initialize_error("failed to send view-only password");
 	}
 
 	// Serverからヘッダを受け取る

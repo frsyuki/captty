@@ -7,7 +7,7 @@
 #include <limits>
 #include "multiplexer.h"
 #include "pty_make_raw.h"
-#include "unio.h"
+#include "uniext.h"
 #include "fdtransport.h"
 
 #include <iostream>
@@ -44,29 +44,14 @@ filt_telnetd::filt_telnetd() : emtelnet((void*)this)
 
 
 Multiplexer::Multiplexer(int host_socket, int gate_socket,
-	const char* session_name, size_t session_name_length,
-	const char* password, size_t password_length) :
-		impl(new MultiplexerIMPL( host_socket, gate_socket,
-			     session_name, session_name_length,
-			     password, password_length )) {}
+		const session_info_ref_t& info) :
+	impl(new MultiplexerIMPL(host_socket, gate_socket, info)) {}
 MultiplexerIMPL::MultiplexerIMPL(int host_socket, int gate_socket,
-	   const char* session_name, size_t session_name_length,
-	   const char* password, size_t password_length ) :
-		host(host_socket), gate(gate_socket),
-		num_guest(0),
-		m_session_name_length(session_name_length),
-		m_password_length(password_length)
+		const session_info_ref_t& info) :
+	host(host_socket), gate(gate_socket),
+	num_guest(0),
+	m_info(info)
 {
-	if( session_name_length > MAX_SESSION_NAME_LENGTH ) {
-		throw initialize_error("session name is too long");
-	}
-	if( password_length >  MAX_PASSWORD_LENGTH ) {
-		throw initialize_error("password is too long");
-	}
-
-	std::memcpy(m_session_name, session_name, m_session_name_length);
-	std::memcpy(m_password, password, m_password_length);
-
 	// 監視対象のファイルディスクリプタにO_NONBLOCKをセット
 	if( fcntl(host, F_SETFL, O_NONBLOCK) < 0 ) {
 		throw initialize_error("failed to set host socket mode");
@@ -82,6 +67,23 @@ MultiplexerIMPL::MultiplexerIMPL(int host_socket, int gate_socket,
 	if( mpev.add(gate, mp::EV_READ) < 0 ) {
 		throw initialize_error("can't add gate socket to IO multiplexer");
 	}
+
+	// プロセス名を変更
+	// session_nameに使われていない文字を探す
+	int delimiter;
+	char* exist;
+	for(delimiter = 0x3A; delimiter <= 0x7E; ++delimiter) {
+		// ':' - '~'
+		if( !(exist = strchr(info.session_name, delimiter)) ) { break; }
+	}
+	if( !exist ) {
+		for(delimiter = 0x21; delimiter < 0x3A; ++delimiter) {
+			// '!' - '9'
+			if( !(exist = strchr(info.session_name, delimiter)) ) { break; }
+		}
+	}
+	if( !exist ) { delimiter = 255; }
+	setprocname("partty-session%c %s%c%s", delimiter, info.session_name, delimiter, info.user_name);
 }
 
 
@@ -116,7 +118,7 @@ int MultiplexerIMPL::run(void)
 			} else if( fd == gate ) {
 				if( io_gate(fd, event) < 0 ) { return 0; }
 			} else {
-				if( io_guest(fd, event) < 0 ) { return 0; }
+				if( io_guest(fd, event, writable_guest[fd]) < 0 ) { return 0; }
 			}
 		}
 		if( mpev.wait() < 0 ) {
@@ -138,13 +140,35 @@ int MultiplexerIMPL::io_gate(int fd, short event)
 			return 0;
 		}
 	}
-	static char trash[1024];
-	read(gate, trash, sizeof(trash));  // FIXME データがあった場合は捨てる？
+static char trash[1024];
+read(gate, trash, sizeof(trash));  // FIXME データがあった場合は捨てる？
+	if( writable_guest.size() <= (writable_guest_t::size_type)guest ) {
+		writable_guest.resize(guest+1);
+	}
 	// セッション名とパスワードをチェック
-	if( msg.password.len != m_password_length ||
-	    memcmp(msg.password.str, m_password, m_password_length) != 0 ||
-	    msg.session_name.len != m_session_name_length ||
-	    memcmp(msg.session_name.str, m_session_name, m_session_name_length) != 0 ) {
+	if( msg.session_name.len != m_info.session_name_length ||
+	    memcmp(msg.session_name.str,
+		   m_info.session_name,
+		   m_info.session_name_length) != 0 ) {
+		// セッション名が不一致
+		perror("session name not match");
+		close(guest);
+		return 0;
+	}
+	if( msg.password.len == m_info.writable_password_length &&
+	    memcmp(msg.password.str,
+		   m_info.writable_password,
+		   m_info.writable_password_length) == 0 ) {
+		// writable passwordが一致 -> writableゲスト
+		writable_guest[guest] = true;
+	} else if( msg.password.len == m_info.readonly_password_length &&
+		   memcmp(msg.password.str,
+			  m_info.readonly_password,
+			  m_info.readonly_password_length) == 0 ) {
+		// readonly passwordが一致 -> read-onlyゲスト
+		writable_guest[guest] = false;
+	} else {
+		// 認証失敗
 		perror("guest authentication failed");
 		close(guest);
 		return 0;
@@ -153,7 +177,7 @@ int MultiplexerIMPL::io_gate(int fd, short event)
 	if( fcntl(guest, F_SETFL, O_NONBLOCK) < 0 ||
 			mpev.add(guest, mp::EV_READ | mp::EV_WRITE) < 0 ) {
 			// イベント待ちは readable or writable から始める
-		perror("guest connection failed b");
+		perror("guest connection failed");
 		close(guest);
 		return 0;
 	}
@@ -194,7 +218,7 @@ int MultiplexerIMPL::io_host(int fd, short event)
 	return 0;
 }
 
-int MultiplexerIMPL::io_guest(int fd, short event)
+int MultiplexerIMPL::io_guest(int fd, short event, bool writable)
 {
 	if( event & mp::EV_READ ) {
 		// ゲスト -> Host
@@ -211,19 +235,20 @@ int MultiplexerIMPL::io_guest(int fd, short event)
 			perror("read from guest ends");
 			remove_guest(fd);
 			return 0;
-		} else {
-			// guest -> host
+		} else if( writable ) {
+			// 書き込み可能guest -> host
 			filt_telnetd::buffer_t ibuf;
 			if( recv_filter(fd, shared_buffer, len, &ibuf) < 0 ) {
 				// 切断されたゲストからのバッファは捨てる
 				return 0;
 			}
-			// FIXME  write_all? ブロッキングモードにする？
+			// FIXME write_all? ブロッキングモードにする？
 			// FIXME Hostが切断されたのかエラーが発生したのか区別できない
 			if( write_all(host, ibuf.buf, ibuf.len) != ibuf.len ) {
 				throw io_error("host socket is broken");
 			}
 		}
+		// read-only guestからの入力はそのまま捨てる
 	}
 	if( event & mp::EV_WRITE ) {
 		// 書き込み待ちバッファ -> ゲスト

@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdexcept>
+#include <cstring>
 
 #ifndef PARTTY_GATE_DIR
 #define PARTTY_GATE_DIR "./var/"
@@ -61,7 +62,7 @@ static const char* const SESSION_END_MESSAGE = PARTTY_SESSION_END_MESSAGE;
 
 static const char VERSION[] = "0.0";
 static const char REVISION[] = "0";
-static const uint8_t PROTOCOL_VERSION = 0;
+static const uint8_t PROTOCOL_VERSION = 1;
 
 static const char   NEGOTIATION_MAGIC_STRING[] = "Partty!";
 static const size_t NEGOTIATION_MAGIC_STRING_LENGTH = 7;
@@ -71,16 +72,18 @@ struct negotiation_header_t {
 	uint8_t protocol_version;
 	uint16_t user_name_length;
 	uint16_t session_name_length;
-	uint16_t password_length;
+	uint16_t writable_password_length;
+	uint16_t readonly_password_length;
 	// char user_name[user_name_length];
 	// char session_name[session_name_length];
-	// char password[password_length];
+	// char writable_password[writable_password_length];
+	// char readonly_password[readonly_password_length];
 };
 
 namespace negotiation_reply {
 	static const uint16_t SUCCESS = 0;
-	static const uint16_t PROTCOL_MISMATCH = 1;
-	static const uint16_t ADDRESS_ALREADY_IN_USE = 2;
+	static const uint16_t PROTOCOL_MISMATCH = 1;
+	static const uint16_t SESSION_UNAVAILABLE = 2;
 	static const uint16_t SERVER_ERROR = 3;
 	static const uint16_t AUTHENTICATION_FAILED = 4;
 };
@@ -89,6 +92,90 @@ struct negotiation_reply_t {
 	uint16_t message_length;
 	// char message[message_length];
 };
+
+
+struct partty_error : public std::runtime_error {
+	partty_error(const std::string& message) : runtime_error(message) {}
+	virtual ~partty_error() throw() {}
+};
+
+struct initialize_error : public partty_error {
+	initialize_error(const std::string& message) : partty_error(message) {}
+	virtual ~initialize_error() throw() {}
+};
+
+struct io_error : public partty_error {
+	io_error(const std::string& message) : partty_error(message) {}
+	virtual ~io_error() throw() {}
+};
+
+struct io_end_error : public io_error {
+	io_end_error(const std::string& message) : io_error(message) {}
+	virtual ~io_end_error() throw() {}
+};
+
+
+struct session_info_t;
+struct session_info_ref_t {
+	inline session_info_ref_t(const session_info_t& src);
+	session_info_ref_t() {}
+	uint16_t user_name_length;
+	uint16_t session_name_length;
+	uint16_t readonly_password_length;
+	uint16_t writable_password_length;
+	const char* user_name;
+	const char* session_name;
+	const char* readonly_password;
+	const char* writable_password;
+};
+
+struct session_info_t {
+	inline session_info_t(const session_info_ref_t& ref);
+	session_info_t() {}
+	uint16_t user_name_length;
+	uint16_t session_name_length;
+	uint16_t writable_password_length;
+	uint16_t readonly_password_length;
+	char user_name[MAX_USER_NAME_LENGTH];
+	char session_name[MAX_SESSION_NAME_LENGTH];
+	char writable_password[MAX_PASSWORD_LENGTH];
+	char readonly_password[MAX_PASSWORD_LENGTH];
+};
+
+session_info_ref_t::session_info_ref_t(const session_info_t& src) :
+	user_name_length         (src.user_name_length        ),
+	session_name_length      (src.session_name_length     ),
+	readonly_password_length (src.readonly_password_length),
+	writable_password_length (src.writable_password_length),
+	session_name             (src.session_name            ),
+	readonly_password        (src.readonly_password       ),
+	writable_password        (src.writable_password       ) {}
+
+session_info_t::session_info_t(const session_info_ref_t& ref) :
+	session_name_length      (ref.session_name_length     ),
+	writable_password_length (ref.writable_password_length),
+	readonly_password_length (ref.readonly_password_length)
+{
+	if( user_name_length > MAX_USER_NAME_LENGTH ) {
+		throw initialize_error("user name is too long");
+	}
+	if( session_name_length > MAX_SESSION_NAME_LENGTH ) {
+		throw initialize_error("session name is too long");
+	}
+	if( session_name_length < MIN_SESSION_NAME_LENGTH ) {
+		throw initialize_error("session name is too short");
+	}
+	if( writable_password_length > MAX_PASSWORD_LENGTH ) {
+		throw initialize_error("operation password is too long");
+	}
+	if( readonly_password_length > MAX_PASSWORD_LENGTH ) {
+		throw initialize_error("view-only password is too long");
+	}
+	std::memcpy(user_name,         ref.user_name,         ref.user_name_length);
+	std::memcpy(session_name,      ref.session_name,      ref.session_name_length);
+	std::memcpy(writable_password, ref.writable_password, ref.writable_password_length);
+	std::memcpy(readonly_password, ref.readonly_password, ref.readonly_password_length);
+}
 
 
 template <size_t Length>
@@ -122,8 +209,7 @@ class MultiplexerIMPL;
 class Multiplexer {
 public:
 	Multiplexer(int host_socket, int gate_socket,
-		const char* session_name, size_t session_name_length,
-		const char* password, size_t password_length);
+		const session_info_ref_t& info);
 	~Multiplexer();
 	int run(void);
 private:
@@ -140,8 +226,7 @@ class HostIMPL;
 class Host {
 public:
 	Host(int server_socket, char lock_code,
-		const char* session_name, size_t session_name_length,
-		const char* password, size_t password_length);
+		const session_info_ref_t& info);
 	~Host();
 	int run(void);
 private:
@@ -163,27 +248,6 @@ private:
 	GateIMPL* impl;
 	Gate();
 	Gate(const Gate&);
-};
-
-
-struct partty_error : public std::runtime_error {
-	partty_error(const std::string& message) : runtime_error(message) {}
-	virtual ~partty_error() throw() {}
-};
-
-struct initialize_error : public partty_error {
-	initialize_error(const std::string& message) : partty_error(message) {}
-	virtual ~initialize_error() throw() {}
-};
-
-struct io_error : public partty_error {
-	io_error(const std::string& message) : partty_error(message) {}
-	virtual ~io_error() throw() {}
-};
-
-struct io_end_error : public io_error {
-	io_end_error(const std::string& message) : io_error(message) {}
-	virtual ~io_end_error() throw() {}
 };
 
 

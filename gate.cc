@@ -7,7 +7,7 @@
 #include <sys/wait.h>
 #include "gate.h"
 #include "fdtransport.h"
-#include "unio.h"
+#include "uniext.h"
 
 #include <iostream>
 
@@ -108,9 +108,8 @@ int GateIMPL::accept_guest(void)
 	//td.send_wont(emtelnet::OPT_ECHO);
 	//td.send_will(emtelnet::OPT_LINEMODE);
 	//td.send_do(emtelnet::OPT_LINEMODE);
-	if( write_message(td, guest,
-			GATE_SESSION_BANNER,
-			strlen(GATE_SESSION_BANNER)) < 0 ) {
+	if( write_message(td, guest, GATE_SESSION_BANNER,
+				strlen(GATE_SESSION_BANNER)) < 0 ) {
 		return E_SESSION_NAME;
 	}
 	rl = read_line(td, guest, msg.session_name.str, MAX_SESSION_NAME_LENGTH);
@@ -124,9 +123,8 @@ int GateIMPL::accept_guest(void)
 	//td.send_wont(emtelnet::OPT_ECHO);
 	td.send_will(emtelnet::OPT_ECHO);
 	td.send_dont(emtelnet::OPT_ECHO);
-	if( write_message(td, guest,
-			GATE_PASSWORD_BANNER,
-			strlen(GATE_PASSWORD_BANNER)) < 0 ) {
+	if( write_message(td, guest, GATE_PASSWORD_BANNER,
+				strlen(GATE_PASSWORD_BANNER)) < 0 ) {
 		return E_PASSWORD;
 	}
 	rl = read_line(td, guest, msg.password.str, MAX_PASSWORD_LENGTH);

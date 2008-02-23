@@ -1,12 +1,24 @@
 #include "partty.h"
-#include "unio.h"
+#include "uniext.h"
 #include <kazuhiki/basic.h>
 #include <kazuhiki/network.h>
 #include <iostream>
+#include <string>
 #include <stdio.h>
-
-#include <pwd.h>
 #include <unistd.h>
+#include <pwd.h>
+
+namespace {
+
+char* getusername(void) {
+	static char unknown_user[] = "nobody";
+	struct passwd* pw = getpwuid(geteuid());
+	if(pw == NULL) {
+		return unknown_user;
+	} else {
+		return pw->pw_name;
+	}
+}
 
 void usage(void)
 {
@@ -19,29 +31,36 @@ void usage(void)
 		<< "   [example 2        ]$ partty-host  -s mysession  -c 'a'  partty.net\n"
 		<< "\n"
 		<< "   options:\n"
-		<< "     -s <session name>      session name\n"
-		<< "     -p <password>          password to join the session\n"
-		<< "     -c <lock character>    control key to lock guest operation []]\n"
+		<< "     -s <session name>        session name\n"
+		<< "     -u <user name>           user name ["<<getusername()<<"]\n"
+		<< "     -w <oparation password>  password to operate the session\n"
+		<< "     -r <view-only password>  password to view the session\n"
+		<< "     -c <lock character>      control key to lock guest operation []]\n"
 		<< "\n"
 		<< std::endl;
+}
+
 }
 
 int main(int argc, char* argv[])
 {
 	std::string session_name;
-	std::string password;
+	std::string writable_password;
+	std::string readonly_password;
 	char lock_char = ']';
 	bool session_name_set;
-	bool password_set;
+	bool writable_password_set;
+	bool readonly_password_set;
 	bool lock_char_set;
 	struct sockaddr_storage saddr;
 	try {
 		using namespace Kazuhiki;
 		Parser kz;
 		--argc;  ++argv;  // skip argv[0]
-		kz.on("-s", "--session",  Accept::String(session_name), session_name_set);
-		kz.on("-p", "--password", Accept::String(password),     password_set);
-		kz.on("-c", "--lock",     Accept::Character(lock_char), lock_char_set);
+		kz.on("-s", "--session",   Accept::String(session_name), session_name_set);
+		kz.on("-w", "--password",  Accept::String(writable_password), writable_password_set);
+		kz.on("-r", "--view-only", Accept::String(readonly_password), readonly_password_set);
+		kz.on("-c", "--lock",      Accept::Character(lock_char), lock_char_set);
 		kz.break_parse(argc, argv);  // parse!
 
 		if( argc != 1 ) {
@@ -66,7 +85,7 @@ int main(int argc, char* argv[])
 	// セッション名チェック
 	if( !session_name_set ) {
 		char sbuf[Partty::MAX_USER_NAME_LENGTH+2];  // 長さ超過を検知するために+2
-		std::cerr << "session name: " << std::flush;
+		std::cerr << "Session name: " << std::flush;
 		std::cin.getline(sbuf, sizeof(sbuf));
 		session_name = sbuf;
 	}
@@ -80,14 +99,24 @@ int main(int argc, char* argv[])
 	}
 
 	// パスワードチェック
-	if( !password_set ) {
-		char* pass = getpass("password: ");
-		password = pass;
+	if( !writable_password_set ) {
+		char* pass = getpass("Operation password: ");
+		writable_password = pass;
 	}
-	if( password.length() > Partty::MAX_PASSWORD_LENGTH ) {
-		std::cerr << "Password is too long" << std::endl;
+	if( writable_password.length() > Partty::MAX_PASSWORD_LENGTH ) {
+		std::cerr << "Operation password is too long" << std::endl;
 		return 1;
 	}
+
+	if( !readonly_password_set ) {
+		char* pass = getpass("View-only password: ");
+		readonly_password = pass;
+	}
+	if( readonly_password.length() > Partty::MAX_PASSWORD_LENGTH ) {
+		std::cerr << "View-only password is too long" << std::endl;
+		return 1;
+	}
+
 
 	// ソケットをlisten
 	int ssock = socket(saddr.ss_family, SOCK_STREAM, 0);
@@ -103,12 +132,20 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
+	Partty::session_info_ref_t info;
+	info.user_name = getusername();
+	info.user_name_length = std::strlen(info.user_name);
+	info.session_name = session_name.c_str();
+	info.session_name_length = session_name.length();
+	info.writable_password = writable_password.c_str();
+	info.writable_password_length = writable_password.length();
+	info.readonly_password = readonly_password.c_str();
+	info.readonly_password_length = readonly_password.length();
+
 	// Host開始
 	try {
 		char lock_code = lock_char - 'a' + 1;
-		Partty::Host host(ssock, lock_code,
-				session_name.c_str(), session_name.length(),
-				password.c_str(), password.length());
+		Partty::Host host(ssock, lock_code, info);
 		return host.run();
 	} catch (Partty::partty_error& e) {
 		std::cerr << "error: " << e.what() << std::endl;

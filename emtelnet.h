@@ -11,11 +11,11 @@ public:
 	virtual ~emtelnet();
 	typedef unsigned char byte;
 public:
-	// process `buf' to send it to client
+	// process `buf' to send it to partner
 	// and save the result to obffer
 	void send(const void* buf, size_t len);
 
-	// process `buf' as received data from client
+	// process `buf' as received data from partner
 	// and save the result to ibuffer
 	void recv(const void* buf, size_t len);
 
@@ -23,7 +23,7 @@ public:
 	void send_wont(byte cmd);
 	void send_do(byte cmd);
 	void send_dont(byte cmd);
-	void send_sb(byte cmd, const void* msg, size_t len);  // FIXME not implemented yet
+	void send_sb(byte cmd, const void* msg, size_t len);  // FIXME not implemented
 public:
 	typedef void (*my_option_handler_t)(char cmd, bool sw, emtelnet& self);
 	typedef void (*partner_option_handler_t)(char cmd, bool sw, emtelnet& self);

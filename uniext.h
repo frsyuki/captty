@@ -44,6 +44,9 @@ inline size_t write_all(int fd, const void *buf, size_t count) {
 	return count;
 }
 
+void initprocname(int argc, char**& argv, char**& envp);
+
+void setprocname(const char *fmt, ...);
 
 }  // namespace Partty
 

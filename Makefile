@@ -9,7 +9,7 @@ all: partty-server partty-host partty-gate partty-scale
 %.o: %.cc
 	$(CXX) -c $< $(CFLAGS)
 
-partty-server: server.o emtelnet.o multiplexer.o cmd_server.o
+partty-server: server.o emtelnet.o multiplexer.o cmd_server.o uniext.o
 	$(CXX) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
 partty-host: cmd_host.o host.o ptyshell.o
@@ -25,7 +25,7 @@ connect: connect.c
 	gcc connect.c -o connect -lresolv
 
 clean:
-	$(RM) emtelnet.o ptyshell.o
+	$(RM) emtelnet.o ptyshell.o uniext.o
 	$(RM) server.o multiplexer.o host.o gate.o scale.o
 	$(RM) cmd_host.o cmd_server.o cmd_gate.o
 

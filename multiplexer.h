@@ -1,5 +1,6 @@
 #include <mp/event.h>
 #include <mp/sparse_array.h>
+#include <vector>
 #include "emtelnet.h"
 #include "partty.h"
 
@@ -68,8 +69,7 @@ void filt_telnetd::get_obuffer(buffer_t* out) {
 class MultiplexerIMPL {
 public:
 	MultiplexerIMPL(int host_socket, int gate_socket,
-		const char* session_name, size_t session_name_length,
-		const char* password, size_t password_length);
+			const session_info_ref_t& info);
 	~MultiplexerIMPL();
 	int run(void);
 private:
@@ -83,17 +83,18 @@ private:
 	guest_set_t guest_set;
 	int num_guest;
 
+	typedef std::vector<bool> writable_guest_t;
+	writable_guest_t writable_guest;
+
 	static const size_t SHARED_BUFFER_SIZE = 32 * 1024;
 	char shared_buffer[SHARED_BUFFER_SIZE];
 
-	char m_session_name[MAX_SESSION_NAME_LENGTH];
-	char m_password[MAX_PASSWORD_LENGTH];
-	size_t m_session_name_length;
-	size_t m_password_length;
+	session_info_t m_info;
 private:
 	int io_gate(int fd, short event);
 	int io_host(int fd, short event);
-	int io_guest(int fd, short event);
+	int io_guest(int fd, short event, bool writable);
+	int io_message(int fd, short event);
 	int recv_filter(int fd, const void* buf, size_t len, filt_telnetd::buffer_t* ibuf);
 	int send_to_guest(int fd, const void* buf, size_t len);
 	int guest_try_write(int fd, filt_telnetd& srv);
