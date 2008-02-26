@@ -15,7 +15,7 @@ partty-server: server.o emtelnet.o multiplexer.o cmd_server.o uniext.o
 partty-host: cmd_host.o host.o ptyshell.o
 	$(CXX) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
-partty-gate: gate.o emtelnet.o cmd_gate.o
+partty-gate: gate.o raw_gate.o emtelnet.o cmd_gate.o
 	$(CXX) $(CFLAGS) $(LDFLAGS) $^ -o $@
 
 partty-scale: scale.o

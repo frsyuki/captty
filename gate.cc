@@ -141,7 +141,7 @@ int GateIMPL::accept_guest(void)
 
 	memcpy(gate_path + gate_dir_len, msg.session_name.str, msg.session_name.len);
 	gate_path[gate_dir_len + msg.session_name.len] = '\0';  // NULL終端を付ける
-	std::cout << gate_path << std::endl;
+std::cerr << gate_path << std::endl;
 	int gate = connect_gate(gate_path);
 	if( gate < 0 ) { return E_SESSION_NAME; }
 

@@ -36,9 +36,9 @@ private:
 	static const int E_SUCCESS = 0;
 	static const int E_ACCEPT = 1;
 	static const int E_FINISH = 2;
-	static const int E_SENDFD = 3;
-	static const int E_SESSION_NAME   = 4;
-	static const int E_PASSWORD = 5;
+	static const int E_SESSION_NAME = 3;
+	static const int E_PASSWORD = 4;
+	static const int E_SENDFD = 5;
 };
 
 

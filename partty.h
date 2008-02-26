@@ -16,7 +16,7 @@
 
 #ifndef PARTTY_GATE_SESSION_BANNER
 #define PARTTY_GATE_SESSION_BANNER \
-	"Welcome to Partty hogehoge!\n\nSession name: "
+	"Welcome to Partty hogehoge!\r\n\r\nSession name: "
 #endif
 
 #ifndef PARTTY_GATE_PASSWORD_BANNER
@@ -38,6 +38,14 @@
 #define PARTTY_SESSION_END_MESSAGE \
 	">Partty! end"
 #endif
+
+
+#define PARTTY_RAW_GATE_FLASH_CROSS_DOMAIN_SUPPORT
+#ifndef PARTTY_RAW_GATE_FLASH_CROSS_DOMAIN_POLICY
+#define PARTTY_RAW_GATE_FLASH_CROSS_DOMAIN_POLICY \
+	"<cross-domain-policy><allow-access-from domain=\"*\" to-ports=\"*\"/></cross-domain-policy>"
+#endif
+
 
 namespace Partty {
 
@@ -244,10 +252,27 @@ public:
 	Gate(int listen_socket);
 	~Gate();
 	int run(void);
+	void signal_end(void);
 private:
 	GateIMPL* impl;
 	Gate();
 	Gate(const Gate&);
+};
+
+
+// プロトコルにTelnetではなくRawストリームを
+// 使うGate
+class RawGateIMPL;
+class RawGate {
+public:
+	RawGate(int listen_socket);
+	~RawGate();
+	int run(void);
+	void signal_end(void);
+private:
+	RawGateIMPL* impl;
+	RawGate();
+	RawGate(const RawGate&);
 };
 
 

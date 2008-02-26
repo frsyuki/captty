@@ -7,10 +7,13 @@ void usage(void)
 	std::cout
 		<< "\n"
 		<< "* Partty Gate (listen guest and relay it to the server)\n"
-		<< "   [listen gate]$ partty-gate  # use default port ["<<Partty::GATE_DEFAULT_PORT<<"]\n"
-		<< "   [listen gate]$ partty-gate  <port number>\n"
-		<< "   [listen gate]$ partty-gate  <listen address>[:<port number>]\n"
-		<< "   [listen gate]$ partty-gate  <network interface name>[:<port number>]\n"
+		<< "   [listen gate]$ partty-gate  [options]  # use default port ["<<Partty::GATE_DEFAULT_PORT<<"]\n"
+		<< "   [listen gate]$ partty-gate  [options]  <port number>\n"
+		<< "   [listen gate]$ partty-gate  [options]  <listen address>[:<port number>]\n"
+		<< "   [listen gate]$ partty-gate  [options]  <network interface name>[:<port number>]\n"
+		<< "\n"
+		<< "   options:\n"
+		<< "     -r                       use raw mode instead of telnet\n"
 		<< "\n"
 		<< std::endl;
 }
@@ -44,9 +47,13 @@ int listen_socket(struct sockaddr_storage& saddr)
 int main(int argc, char* argv[])
 {
 	struct sockaddr_storage saddr;
+	bool use_raw = false;
 	try {
 		using namespace Kazuhiki;
+		Parser kz;
 		--argc;  ++argv;  // skip argv[0]
+		kz.on("-r", "--raw", Accept::Boolean(use_raw));
+		kz.break_parse(argc, argv);
 		if( argc == 0 ) {
 			Convert::AnyAddress(saddr, Partty::GATE_DEFAULT_PORT);
 		} else if( argc == 1 ) {
@@ -68,8 +75,13 @@ int main(int argc, char* argv[])
 	}
 
 	try {
-		Partty::Gate gate(ssock);
-		return gate.run();
+		if( use_raw ) {
+			Partty::RawGate gate(ssock);
+			return gate.run();
+		} else {
+			Partty::Gate gate(ssock);
+			return gate.run();
+		}
 	} catch (Partty::partty_error& e) {
 		std::cerr << "error: " << e.what() << std::endl;
 		return 1;
