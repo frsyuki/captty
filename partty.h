@@ -1,6 +1,10 @@
 #ifndef PARTTY_H__
 #define PARTTY_H__ 1
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <stddef.h>
 #include <stdint.h>
 #include <stdexcept>
@@ -68,8 +72,8 @@ static const char* const SESSION_START_MESSAGE = PARTTY_SESSION_START_MESSAGE;
 static const char* const SESSION_END_MESSAGE = PARTTY_SESSION_END_MESSAGE;
 
 
-static const char VERSION[] = "0.0";
-static const char REVISION[] = "0";
+//static const char PARTTY_VERSION[] = "0.0";
+//static const char PARTTY_REVISION[] = "0";
 static const uint8_t PROTOCOL_VERSION = 1;
 
 static const char   NEGOTIATION_MAGIC_STRING[] = "Partty!";
@@ -155,6 +159,7 @@ session_info_ref_t::session_info_ref_t(const session_info_t& src) :
 	session_name_length      (src.session_name_length     ),
 	readonly_password_length (src.readonly_password_length),
 	writable_password_length (src.writable_password_length),
+	user_name                (src.user_name               ),
 	session_name             (src.session_name            ),
 	readonly_password        (src.readonly_password       ),
 	writable_password        (src.writable_password       ) {}

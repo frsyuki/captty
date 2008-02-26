@@ -4,8 +4,17 @@
 #include <string.h>
 #include <termios.h>
 #include <sys/ioctl.h>
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#ifdef HAVE_UTIL_H
 #include <util.h>
-// FIXME Linuxではutil.hの代わりにpty.hで-lutil
+#endif
+#ifdef HAVE_PTY_H
+#include <pty.h>
+#endif
 
 namespace Partty {
 
