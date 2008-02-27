@@ -74,12 +74,12 @@ MultiplexerIMPL::MultiplexerIMPL(int host_socket, int gate_socket,
 	char* exist;
 	for(delimiter = 0x3A; delimiter <= 0x7E; ++delimiter) {
 		// ':' - '~'
-		if( !(exist = strchr(info.session_name, delimiter)) ) { break; }
+		if( (exist = strchr(info.session_name, delimiter)) ) { break; }
 	}
 	if( !exist ) {
 		for(delimiter = 0x21; delimiter < 0x3A; ++delimiter) {
 			// '!' - '9'
-			if( !(exist = strchr(info.session_name, delimiter)) ) { break; }
+			if( (exist = strchr(info.session_name, delimiter)) ) { break; }
 		}
 	}
 	if( !exist ) { delimiter = 255; }
@@ -194,7 +194,7 @@ int MultiplexerIMPL::io_host(int fd, short event)
 	// Hostからread
 	ssize_t len = read(fd, shared_buffer, SHARED_BUFFER_SIZE);
 	if( len < 0 ) {
-		if( errno == EAGAIN || errno == EINTR ) { /* do nothing */ }
+		if( errno == EAGAIN || errno == EINTR ) { return 0; }
 		else { throw io_error("host socket is broken"); }
 	} else if( len == 0 ) {
 		perror("read from host ends");
@@ -225,7 +225,7 @@ int MultiplexerIMPL::io_guest(int fd, short event, bool writable)
 		// ゲストからread
 		ssize_t len = read(fd, shared_buffer, SHARED_BUFFER_SIZE);
 		if( len < 0 ) {
-			if( errno == EAGAIN || errno == EINTR ) { /* do nothing */ }
+			if( errno == EAGAIN || errno == EINTR ) { /* pass through */ }
 			else {
 				perror("read from guest failed");
 				remove_guest(fd);
@@ -242,9 +242,8 @@ int MultiplexerIMPL::io_guest(int fd, short event, bool writable)
 				// 切断されたゲストからのバッファは捨てる
 				return 0;
 			}
-			// FIXME write_all? ブロッキングモードにする？
 			// FIXME Hostが切断されたのかエラーが発生したのか区別できない
-			if( write_all(host, ibuf.buf, ibuf.len) != ibuf.len ) {
+			if( continued_blocking_write_all(host, ibuf.buf, ibuf.len) != ibuf.len ) {
 				throw io_error("host socket is broken");
 			}
 		}
@@ -256,7 +255,7 @@ int MultiplexerIMPL::io_guest(int fd, short event, bool writable)
 		ssize_t len = write(fd, srv.obuffer, srv.olength);
 		//if( srv.olength == 0 ) { return 0; }  // olengthは0の可能性がある？
 		if( len < 0 ) {
-			if( errno == EAGAIN || errno == EINTR ) { /* do nothing */ }
+			if( errno == EAGAIN || errno == EINTR ) { return 0; }
 			else {
 				perror("write to guest failed");
 				remove_guest(fd);

@@ -78,7 +78,7 @@ int HostIMPL::run(void)
 	// ヘッダをチェック
 	{
 		uint16_t msglen = ntohs(reply.message_length);
-		char* msg = (char*)malloc(msglen);
+		char* msg = (char*)malloc(msglen+1);
 		if( msg == NULL ) {
 			throw initialize_error("failed to receive negotiation reply");
 		}
@@ -87,6 +87,7 @@ int HostIMPL::run(void)
 			throw initialize_error("failed to receive negotiation reply");
 		}
 		if( reply.code != negotiation_reply::SUCCESS ) {
+			msg[msglen] = '\0';
 			initialize_error e(msg);
 			free(msg);
 			throw e;
@@ -159,8 +160,7 @@ int HostIMPL::io_stdin(int fd, short event)
 		else { throw io_error("stdinput is broken"); }
 	} else if( len == 0 ) { throw io_end_error("end of stdinput"); }
 	// ブロックしながらシェルに書き込む
-	// XXX 書き込み可能になるまでビジーループ
-	if( write_all(sh, shared_buffer, len) != (size_t)len ){
+	if( continued_blocking_write_all(sh, shared_buffer, len) != (size_t)len ){
 		throw io_error("pty is broken");
 	}
 	// 標準入力のウィンドウサイズが変更されたら子仮想端末にも反映する
@@ -190,8 +190,7 @@ int HostIMPL::io_server(int fd, short event)
 	// ロック中ならServerからの入力は捨てる
 	if( m_locking ) { return 0; }
 	// ブロックしながらシェルに書き込む
-	// XXX 書き込み可能になるまでビジーループ
-	if( write_all(sh, shared_buffer, len) != (size_t)len ){
+	if( continued_blocking_write_all(sh, shared_buffer, len) != (size_t)len ){
 		throw io_error("pty is broken");
 	}
 	return 0;
@@ -207,13 +206,11 @@ int HostIMPL::io_shell(int fd, short event)
 		else { throw io_error("pty is broken"); }
 	} else if( len == 0 ) { throw io_end_error("session ends"); }
 	// ブロックしながら標準出力に書き込む
-	// XXX 書き込み可能になるまでビジーループ
-	if( write_all(STDOUT_FILENO, shared_buffer, len) != (size_t)len ) {
+	if( continued_blocking_write_all(STDOUT_FILENO, shared_buffer, len) != (size_t)len ) {
 		throw io_error("stdoutput is broken");
 	}
 	// ブロックしながらServerに書き込む
-	// XXX 書き込み可能になるまでビジーループ
-	if( write_all(server, shared_buffer, len) != (size_t)len ) {
+	if( continued_blocking_write_all(server, shared_buffer, len) != (size_t)len ) {
 		throw io_error("server connection is broken");
 	}
 	// 標準出力の転送が終わるまで待つ

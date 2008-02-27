@@ -11,12 +11,13 @@
 #include <cstring>
 
 #ifndef PARTTY_GATE_DIR
-#define PARTTY_GATE_DIR "./var/"
+#define PARTTY_GATE_DIR "./var/socket/"
 #endif
 
-//#ifndef PARTTY_GATE_SOCKET_NAME
-//#define PARTTY_GATE_SOCKET_NAME "gate"
-//#endif
+#ifndef PARTTY_ARCHIVE_DIR
+#define PARTTY_ARCHIVE_DIR \
+	"./archive/archive/"
+#endif
 
 #ifndef PARTTY_GATE_SESSION_BANNER
 #define PARTTY_GATE_SESSION_BANNER \
@@ -64,7 +65,7 @@ static const size_t MAX_USER_NAME_LENGTH    = 128;
 
 
 static const char* const GATE_DIR = PARTTY_GATE_DIR;
-//static const char* const GATE_SOCKET_NAME = PARTTY_GATE_SOCKET_NAME;
+static const char* const ARCHIVE_DIR = PARTTY_ARCHIVE_DIR;
 static const char* const GATE_PASSWORD_BANNER = PARTTY_GATE_PASSWORD_BANNER;
 static const char* const GATE_SESSION_BANNER = PARTTY_GATE_SESSION_BANNER;
 static const char* const SERVER_WELCOME_MESSAGE = PARTTY_SERVER_WELCOME_MESSAGE;
@@ -72,8 +73,6 @@ static const char* const SESSION_START_MESSAGE = PARTTY_SESSION_START_MESSAGE;
 static const char* const SESSION_END_MESSAGE = PARTTY_SESSION_END_MESSAGE;
 
 
-//static const char PARTTY_VERSION[] = "0.0";
-//static const char PARTTY_REVISION[] = "0";
 static const uint8_t PROTOCOL_VERSION = 1;
 
 static const char   NEGOTIATION_MAGIC_STRING[] = "Partty!";
@@ -238,6 +237,19 @@ private:
 class HostIMPL;
 class Host {
 public:
+	struct config_t {
+		config_t(int _server_socket,
+				const session_info_ref_t& info_) :
+			server_socket(_server_socket),
+			info(info_) {}
+	public:
+		int lock_code;
+	private:
+		int server_socket;
+		const session_info_ref_t& info;
+		friend class HostIMPL;
+	};
+public:
 	Host(int server_socket, char lock_code,
 		const session_info_ref_t& info);
 	~Host();
@@ -253,6 +265,15 @@ private:
 // Hostに転送する
 class GateIMPL;
 class Gate {
+public:
+	struct config_t {
+		config_t(int listen_socket_) :
+			listen_socket(listen_socket_) {}
+	public:
+	private:
+		int listen_socket;
+		friend class GateIMPL;
+	};
 public:
 	Gate(int listen_socket);
 	~Gate();
