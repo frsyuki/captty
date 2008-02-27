@@ -23,7 +23,7 @@ char* getusername(void) {
 void usage(void)
 {
 	std::cout
-		<< "\n"
+		<< "partty "<<VERSION<<"\n"
 		<< "* Partty Host (create new session)\n"
 		<< "   [connect to server]$ partty-host  [options]  <server name>  # use default port ["<<Partty::SERVER_DEFAULT_PORT<<"]\n"
 		<< "   [connect to server]$ partty-host  [options]  <server name>:<port number>\n"
@@ -35,7 +35,7 @@ void usage(void)
 		<< "     -u <user name>           user name ["<<getusername()<<"]\n"
 		<< "     -w <oparation password>  password to operate the session\n"
 		<< "     -r <view-only password>  password to view the session\n"
-		<< "     -c <lock character>      control key to lock guest operation []]\n"
+		<< "     -c <lock character>      control key to lock guest operation (default: ']')\n"
 		<< "\n"
 		<< std::endl;
 }
