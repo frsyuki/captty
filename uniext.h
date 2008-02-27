@@ -18,8 +18,10 @@ inline size_t read_all(int fd, void *buf, size_t count)
 		const ssize_t num_bytes = read(fd, p, endp - p);
 		if( num_bytes < 0 ) {
 			if( errno != EINTR && errno != EAGAIN ) {
-				return endp - p;
+				return count - (endp - p);
 			}
+		} else if( num_bytes == 0 ) {
+			return count - (endp - p);
 		} else {
 			p += num_bytes;
 		}
@@ -37,8 +39,10 @@ inline size_t write_all(int fd, const void *buf, size_t count)
 		const ssize_t num_bytes = write(fd, p, endp - p);
 		if( num_bytes < 0 ) {
 			if( errno != EINTR && errno != EAGAIN ) {
-				return endp - p;
+				return count - (endp - p);
 			}
+		} else if( num_bytes == 0 ) {
+			return count - (endp - p);
 		} else {
 			p += num_bytes;
 		}
@@ -68,8 +72,10 @@ inline size_t continued_blocking_read_all(int fd, void* buf, size_t count)
 		num_bytes = read(fd, p, endp - p);
 		if( num_bytes < 0 ) {
 			if( errno != EINTR && errno != EAGAIN ) {
-				break;
+				return count - (endp - p);
 			}
+		} else if( num_bytes == 0 ) {
+			return count - (endp - p);
 		} else {
 			p += num_bytes;
 		}
@@ -77,7 +83,7 @@ inline size_t continued_blocking_read_all(int fd, void* buf, size_t count)
 
 	fcntl(fd, F_SETFL, O_NONBLOCK);
 
-	return endp - p;
+	return count;
 }
 
 inline size_t continued_blocking_write_all(int fd, const void* buf, size_t count)
@@ -101,8 +107,10 @@ inline size_t continued_blocking_write_all(int fd, const void* buf, size_t count
 		num_bytes = write(fd, p, endp - p);
 		if( num_bytes < 0 ) {
 			if( errno != EINTR && errno != EAGAIN ) {
-				break;
+				return count - (endp - p);
 			}
+		} else if( num_bytes == 0 ) {
+			return count - (endp - p);
 		} else {
 			p += num_bytes;
 		}
@@ -110,7 +118,7 @@ inline size_t continued_blocking_write_all(int fd, const void* buf, size_t count
 
 	fcntl(fd, F_SETFL, O_NONBLOCK);
 
-	return endp - p;
+	return count;
 }
 
 void initprocname(int argc, char**& argv, char**& envp);

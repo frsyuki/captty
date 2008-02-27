@@ -16,7 +16,7 @@ private:
 
 class GateIMPL {
 public:
-	GateIMPL(int listen_socket);
+	GateIMPL(Gate::config_t& config);
 	~GateIMPL();
 	int run(void);
 	void signal_end(void);

@@ -76,10 +76,12 @@ int main(int argc, char* argv[])
 
 	try {
 		if( use_raw ) {
-			Partty::RawGate gate(ssock);
+			Partty::RawGate::config_t config(ssock);
+			Partty::RawGate gate(config);
 			return gate.run();
 		} else {
-			Partty::Gate gate(ssock);
+			Partty::Gate::config_t config(ssock);
+			Partty::Gate gate(config);
 			return gate.run();
 		}
 	} catch (Partty::partty_error& e) {

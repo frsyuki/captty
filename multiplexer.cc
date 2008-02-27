@@ -43,15 +43,21 @@ filt_telnetd::filt_telnetd() : emtelnet((void*)this)
 }
 
 
-Multiplexer::Multiplexer(int host_socket, int gate_socket,
-		const session_info_ref_t& info) :
-	impl(new MultiplexerIMPL(host_socket, gate_socket, info)) {}
-MultiplexerIMPL::MultiplexerIMPL(int host_socket, int gate_socket,
-		const session_info_ref_t& info) :
-	host(host_socket), gate(gate_socket),
+Multiplexer::Multiplexer(config_t& config) :
+	impl(new MultiplexerIMPL(config)) {}
+
+MultiplexerIMPL::MultiplexerIMPL(Multiplexer::config_t& config) :
+	host(config.host_socket), gate(config.gate_socket),
 	num_guest(0),
-	m_info(info)
+	m_info(config.info),
+	m_capture_stream(config.capture_stream),
+	m_recorder(NULL)
 {
+	// 録画ON
+	if( m_capture_stream ) {
+		m_recorder = new Captty::Recorder(*m_capture_stream);
+	}
+
 	// 監視対象のファイルディスクリプタにO_NONBLOCKをセット
 	if( fcntl(host, F_SETFL, O_NONBLOCK) < 0 ) {
 		throw initialize_error("failed to set host socket mode");
@@ -74,16 +80,16 @@ MultiplexerIMPL::MultiplexerIMPL(int host_socket, int gate_socket,
 	char* exist;
 	for(delimiter = 0x3A; delimiter <= 0x7E; ++delimiter) {
 		// ':' - '~'
-		if( (exist = strchr(info.session_name, delimiter)) ) { break; }
+		if( (exist = strchr(m_info.session_name, delimiter)) ) { break; }
 	}
 	if( !exist ) {
 		for(delimiter = 0x21; delimiter < 0x3A; ++delimiter) {
 			// '!' - '9'
-			if( (exist = strchr(info.session_name, delimiter)) ) { break; }
+			if( (exist = strchr(m_info.session_name, delimiter)) ) { break; }
 		}
 	}
 	if( !exist ) { delimiter = 255; }
-	setprocname("partty-session%c %s%c%s", delimiter, info.session_name, delimiter, info.user_name);
+	setprocname("partty-session%c %s%c%s", delimiter, m_info.session_name, delimiter, m_info.user_name);
 }
 
 
@@ -102,6 +108,7 @@ MultiplexerIMPL::~MultiplexerIMPL()
 			}
 		}
 	}
+	delete m_recorder;
 }
 
 
@@ -201,6 +208,10 @@ int MultiplexerIMPL::io_host(int fd, short event)
 		return -1;
 	}
 	// len > 0
+	// 録画
+	if( m_capture_stream ) {
+		m_recorder->write(shared_buffer, len);
+	}
 	// ゲストにwrite
 	if( num_guest == 0 ) { return 0; }
 	int n = 0;

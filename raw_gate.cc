@@ -14,9 +14,10 @@
 namespace Partty {
 
 
-RawGate::RawGate(int listen_socket) : impl(new RawGateIMPL(listen_socket)) {}
-RawGateIMPL::RawGateIMPL(int listen_socket) :
-		socket(listen_socket), m_end(0)
+RawGate::RawGate(config_t& config) : impl(new RawGateIMPL(config)) {}
+
+RawGateIMPL::RawGateIMPL(RawGate::config_t& config) :
+		socket(config.listen_socket), m_end(0)
 {
 	gate_dir_len = strlen(GATE_DIR);
 	if( gate_dir_len > PATH_MAX ) {
@@ -26,8 +27,11 @@ RawGateIMPL::RawGateIMPL(int listen_socket) :
 	// この時点ではgate_pathにはNULL終端が付いていない
 }
 
+
 RawGate::~RawGate() { delete impl; }
+
 RawGateIMPL::~RawGateIMPL() {}
+
 
 int RawGate::run(void) { return impl->run(); }
 int RawGateIMPL::run(void)

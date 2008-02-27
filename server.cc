@@ -8,22 +8,28 @@
 #include <sys/ioctl.h>
 #include <arpa/inet.h>
 #include <fcntl.h>
+#include <fstream>
+#include <sstream>
 #include "uniext.h"
 #include "fdtransport.h"
 
 namespace Partty {
 
 
-Server::Server(int listen_socket) :
-	impl(new ServerIMPL(listen_socket)) {}
-ServerIMPL::ServerIMPL(int listen_socket) :
-	sock(listen_socket) {}
+Server::Server(config_t& config) :
+	impl(new ServerIMPL(config)) {}
+
+ServerIMPL::ServerIMPL(Server::config_t& config) :
+	sock(config.listen_socket) {}
+
 
 Server::~Server() { delete impl; }
+
 ServerIMPL::~ServerIMPL()
 {
 	close(sock);
 }
+
 
 Lobby::Lobby(int listen_socket) : sock(listen_socket), max_fd(-1)
 {
@@ -123,12 +129,14 @@ perror("waiting header");
 int Lobby::io_payload(mpio& mp, int fd, void* buf, size_t just, size_t len)
 {
 	if( len != just ) {
+		perror("connection closed");
 		remove_host(fd, buf);
 		return 0;
 	}
 
 	negotiation_header_t* header = reinterpret_cast<negotiation_header_t*>(buf);
 	if( memcmp(NEGOTIATION_MAGIC_STRING, header->magic, NEGOTIATION_MAGIC_STRING_LENGTH) != 0 ) {
+		perror("protocol mismatch");
 		send_error_reply(fd, buf, negotiation_reply::PROTOCOL_MISMATCH, "protocol mismatch");
 		return 0;
 	}
@@ -140,6 +148,7 @@ int Lobby::io_payload(mpio& mp, int fd, void* buf, size_t just, size_t len)
 	header->readonly_password_length = ntohs(header->readonly_password_length);
 
 	if( header->protocol_version != PROTOCOL_VERSION ) {
+		perror("protocol version mismatch");
 		send_error_reply(fd, buf, negotiation_reply::PROTOCOL_MISMATCH, "protocol version mismatch");
 		return 0;
 	}
@@ -150,6 +159,7 @@ int Lobby::io_payload(mpio& mp, int fd, void* buf, size_t just, size_t len)
 	    header->writable_password_length > MAX_PASSWORD_LENGTH ||
 	    header->readonly_password_length > MAX_PASSWORD_LENGTH ||
 	    header->session_name_length == 0 ) {
+		perror("authentication failed");
 		send_error_reply(fd, buf, negotiation_reply::AUTHENTICATION_FAILED, "authentication failed");
 		return 0;
 	}
@@ -162,6 +172,7 @@ int Lobby::io_payload(mpio& mp, int fd, void* buf, size_t just, size_t len)
 				header->writable_password_length +
 				header->readonly_password_length,
 			mp::bind(&Lobby::io_fork, this, _1, _2, _3, _4, _5)) < 0 ) {
+		perror("multiplexer broken");
 		send_error_reply(fd, buf, negotiation_reply::SERVER_ERROR, "multiplexer is broken");
 		return 0;
 	}
@@ -205,6 +216,7 @@ int Lobby::io_fork(mpio& mp, int fd, void* payload, size_t just, size_t len)
 {
 	void* buf = (void*)(((char*)payload) - sizeof(negotiation_header_t));
 	if( len != just ) {
+		perror("connection closed");
 		remove_host(fd, buf);
 		return 0;
 	}
@@ -317,13 +329,27 @@ int ServerIMPL::run_multiplexer(host_info_t& info)
 
 	int ret;
 	try {
-		Multiplexer multiplexer(info.fd, gate, session_info_ref_t(info));
+		struct timeval tv;
+		if( gettimeofday(&tv, NULL) < 0 ) {
+			throw initialize_error("can't get time");
+		}
+		std::ostringstream record_path;
+		record_path << PARTTY_ARCHIVE_DIR;
+		record_path << static_cast<int64_t>(tv.tv_sec);
+		std::ofstream record( record_path.str().c_str() );
+		session_info_ref_t ref(info);
+		Multiplexer::config_t config(info.fd, gate, ref);
+		config.capture_stream = &record;
+		Multiplexer multiplexer(config);
 		if( sync_reply(fd, negotiation_reply::SUCCESS, "ok") < 0 ) {
 			throw io_error("sync reply failed");
 		}
-		std::cerr << "session " << info.session_name << " by " << info.user_name << std::endl;
+		std::cerr << "session ";
+		std::cerr.write(info.session_name, info.session_name_length);
+		std::cerr << " by ";
+		std::cerr.write(info.user_name, info.user_name_length);
+		std::cerr << std::endl;
 		ret = multiplexer.run();
-		unlink(gate_path);
 	} catch (initialize_error& e) {
 		perror(e.what());
 		sync_reply(fd, negotiation_reply::SERVER_ERROR, e.what());

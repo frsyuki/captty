@@ -7,8 +7,7 @@ namespace Partty {
 
 class HostIMPL {
 public:
-	HostIMPL(int server_socket, char lock_code,
-			const session_info_ref_t& info);
+	HostIMPL(Host::config_t& config);
 	~HostIMPL();
 	int run(void);
 private:

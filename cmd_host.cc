@@ -144,8 +144,9 @@ int main(int argc, char* argv[])
 
 	// Host開始
 	try {
-		char lock_code = lock_char - 'a' + 1;
-		Partty::Host host(ssock, lock_code, info);
+		Partty::Host::config_t config(ssock, info);
+		config.lock_code = lock_char - 'a' + 1;;
+		Partty::Host host(config);
 		return host.run();
 	} catch (Partty::partty_error& e) {
 		std::cerr << "error: " << e.what() << std::endl;

@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stdexcept>
 #include <cstring>
+#include <iostream>
 
 #ifndef PARTTY_GATE_DIR
 #define PARTTY_GATE_DIR "./var/socket/"
@@ -16,7 +17,7 @@
 
 #ifndef PARTTY_ARCHIVE_DIR
 #define PARTTY_ARCHIVE_DIR \
-	"./archive/archive/"
+	"./var/archive/"
 #endif
 
 #ifndef PARTTY_GATE_SESSION_BANNER
@@ -128,20 +129,20 @@ struct io_end_error : public io_error {
 
 struct session_info_t;
 struct session_info_ref_t {
-	inline session_info_ref_t(const session_info_t& src);
+	explicit inline session_info_ref_t(const session_info_t& src);
 	session_info_ref_t() {}
 	uint16_t user_name_length;
 	uint16_t session_name_length;
-	uint16_t readonly_password_length;
 	uint16_t writable_password_length;
+	uint16_t readonly_password_length;
 	const char* user_name;
 	const char* session_name;
-	const char* readonly_password;
 	const char* writable_password;
+	const char* readonly_password;
 };
 
 struct session_info_t {
-	inline session_info_t(const session_info_ref_t& ref);
+	explicit inline session_info_t(const session_info_ref_t& ref);
 	session_info_t() {}
 	uint16_t user_name_length;
 	uint16_t session_name_length;
@@ -164,6 +165,7 @@ session_info_ref_t::session_info_ref_t(const session_info_t& src) :
 	writable_password        (src.writable_password       ) {}
 
 session_info_t::session_info_t(const session_info_ref_t& ref) :
+	user_name_length         (ref.user_name_length        ),
 	session_name_length      (ref.session_name_length     ),
 	writable_password_length (ref.writable_password_length),
 	readonly_password_length (ref.readonly_password_length)
@@ -205,7 +207,16 @@ struct gate_message_t {
 class ServerIMPL;
 class Server {
 public:
-	Server(int listen_socket);
+	struct config_t {
+		config_t(int listen_socket_) :
+			listen_socket(listen_socket_) {}
+	private:
+		int listen_socket;
+		friend class ServerIMPL;
+		config_t();
+	};
+public:
+	Server(config_t& config);
 	~Server();
 	int run(void);
 private:
@@ -220,8 +231,24 @@ private:
 class MultiplexerIMPL;
 class Multiplexer {
 public:
-	Multiplexer(int host_socket, int gate_socket,
-		const session_info_ref_t& info);
+	struct config_t {
+		config_t(int host_socket_, int gate_socket_,
+				const session_info_ref_t& info_) :
+			capture_stream(NULL),
+			host_socket(host_socket_),
+			gate_socket(gate_socket_),
+			info(info_) {}
+	public:
+		std::ostream* capture_stream;
+	private:
+		int host_socket;
+		int gate_socket;
+		const session_info_ref_t& info;
+		friend class MultiplexerIMPL;
+		config_t();
+	};
+public:
+	Multiplexer(config_t& config);
 	~Multiplexer();
 	int run(void);
 private:
@@ -240,6 +267,7 @@ public:
 	struct config_t {
 		config_t(int _server_socket,
 				const session_info_ref_t& info_) :
+			lock_code(0),
 			server_socket(_server_socket),
 			info(info_) {}
 	public:
@@ -248,10 +276,10 @@ public:
 		int server_socket;
 		const session_info_ref_t& info;
 		friend class HostIMPL;
+		config_t();
 	};
 public:
-	Host(int server_socket, char lock_code,
-		const session_info_ref_t& info);
+	Host(config_t& config);
 	~Host();
 	int run(void);
 private:
@@ -273,9 +301,10 @@ public:
 	private:
 		int listen_socket;
 		friend class GateIMPL;
+		config_t();
 	};
 public:
-	Gate(int listen_socket);
+	Gate(config_t& config);
 	~Gate();
 	int run(void);
 	void signal_end(void);
@@ -291,7 +320,16 @@ private:
 class RawGateIMPL;
 class RawGate {
 public:
-	RawGate(int listen_socket);
+	struct config_t {
+		config_t(int listen_socket_) :
+			listen_socket(listen_socket_) {}
+	public:
+	private:
+		int listen_socket;
+		friend class RawGateIMPL;
+		config_t();
+	};
+	RawGate(config_t& config);
 	~RawGate();
 	int run(void);
 	void signal_end(void);

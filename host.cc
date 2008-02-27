@@ -17,16 +17,13 @@ namespace Partty {
 
 // FIXME Serverとのコネクションが切断したら再接続する？
 
-Host::Host(int server_socket, char lock_code,
-		const session_info_ref_t& info) :
-		impl( new HostIMPL(server_socket, lock_code,
-					info) ) {}
+Host::Host(config_t& config) :
+		impl( new HostIMPL(config) ) {}
 
-HostIMPL::HostIMPL(int server_socket, char lock_code,
-		const session_info_ref_t& info) :
-	server(server_socket),
-	m_lock_code(lock_code), m_locking(false),
-	m_info(info) {}
+HostIMPL::HostIMPL(Host::config_t& config) :
+	server(config.server_socket),
+	m_lock_code(config.lock_code), m_locking(false),
+	m_info(config.info) {}
 
 
 Host::~Host() { delete impl; }

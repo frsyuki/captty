@@ -3,6 +3,7 @@
 #include <vector>
 #include "emtelnet.h"
 #include "partty.h"
+#include "captty.h"
 
 namespace Partty {
 
@@ -68,8 +69,7 @@ void filt_telnetd::get_obuffer(buffer_t* out) {
 
 class MultiplexerIMPL {
 public:
-	MultiplexerIMPL(int host_socket, int gate_socket,
-			const session_info_ref_t& info);
+	MultiplexerIMPL(Multiplexer::config_t& config);
 	~MultiplexerIMPL();
 	int run(void);
 private:
@@ -90,6 +90,9 @@ private:
 	char shared_buffer[SHARED_BUFFER_SIZE];
 
 	session_info_t m_info;
+
+	std::ostream* m_capture_stream;
+	Captty::Recorder *m_recorder;
 private:
 	int io_gate(int fd, short event);
 	int io_host(int fd, short event);

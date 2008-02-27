@@ -5,7 +5,7 @@ namespace Partty {
 
 class RawGateIMPL {
 public:
-	RawGateIMPL(int listen_socket);
+	RawGateIMPL(RawGate::config_t& config);
 	~RawGateIMPL();
 	int run(void);
 	void signal_end(void);

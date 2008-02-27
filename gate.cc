@@ -34,9 +34,10 @@ phrase_telnetd::phrase_telnetd() : emtelnet((void*)this) {
 }
 
 
-Gate::Gate(int listen_socket) : impl(new GateIMPL(listen_socket)) {}
-GateIMPL::GateIMPL(int listen_socket) :
-		socket(listen_socket), m_end(0)
+Gate::Gate(config_t& config) : impl(new GateIMPL(config)) {}
+
+GateIMPL::GateIMPL(Gate::config_t& config) :
+		socket(config.listen_socket), m_end(0)
 {
 	gate_dir_len = strlen(GATE_DIR);
 	if( gate_dir_len > PATH_MAX ) {
@@ -46,8 +47,11 @@ GateIMPL::GateIMPL(int listen_socket) :
 	// この時点ではgate_pathにはNULL終端が付いていない
 }
 
+
 Gate::~Gate() { delete impl; }
+
 GateIMPL::~GateIMPL() {}
+
 
 int Gate::run(void) { return impl->run(); }
 int GateIMPL::run(void)

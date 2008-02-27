@@ -6,8 +6,6 @@ namespace Partty {
 
 struct host_info_t : session_info_t {
 	int fd;
-	uint16_t user_name_length;
-	char user_name[MAX_USER_NAME_LENGTH];
 };
 
 class Lobby {
@@ -60,7 +58,7 @@ private:
 
 class ServerIMPL {
 public:
-	ServerIMPL(int listen_socket);
+	ServerIMPL(Server::config_t& config);
 	~ServerIMPL();
 	int run(void);
 private:

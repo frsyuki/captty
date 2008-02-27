@@ -84,7 +84,8 @@ int main(int argc, char* argv[], char* envp[])
 	}
 
 	try {
-		Partty::Server server(ssock);
+		Partty::Server::config_t config(ssock);
+		Partty::Server server(config);
 		return server.run();
 	} catch (Partty::partty_error& e) {
 		std::cerr << "error: " << e.what() << std::endl;
