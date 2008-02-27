@@ -203,7 +203,9 @@ int HostIMPL::io_shell(int fd, short event)
 		else { throw io_error("pty is broken"); }
 	} else if( len == 0 ) { throw io_end_error("session ends"); }
 	// ブロックしながら標準出力に書き込む
-	if( continued_blocking_write_all(STDOUT_FILENO, shared_buffer, len) != (size_t)len ) {
+	// STDOUT_FILENOはblocking mode
+	if( write_all(STDOUT_FILENO, shared_buffer, len) != (size_t)len ) {
+		perror("hogehoge");
 		throw io_error("stdoutput is broken");
 	}
 	// ブロックしながらServerに書き込む
