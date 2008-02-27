@@ -79,7 +79,8 @@ int ServerIMPL::run(void)
 	}
 }
 
-void ScopedLobby::forked_destroy(int fd) {
+void ScopedLobby::forked_destroy(int fd)
+{
 	impl->forked_destroy(fd);
 	delete impl;
 	impl = NULL;
@@ -167,7 +168,6 @@ int Lobby::io_payload(mpio& mp, int fd, void* buf, size_t just, size_t len)
 	using namespace mp::placeholders;
 	if( mp::ios::ios_read_just(mp, fd, (char*)buf + sizeof(negotiation_header_t),
 			header->user_name_length +
-				header->user_name_length +
 				header->session_name_length +
 				header->writable_password_length +
 				header->readonly_password_length,
@@ -329,27 +329,61 @@ int ServerIMPL::run_multiplexer(host_info_t& info)
 
 	int ret;
 	try {
-		struct timeval tv;
-		if( gettimeofday(&tv, NULL) < 0 ) {
-			throw initialize_error("can't get time");
+		std::ofstream* record = NULL;
+		{
+			struct timeval tv;
+			if( gettimeofday(&tv, NULL) < 0 ) {
+				throw initialize_error("can't get time");
+			}
+
+			std::ostringstream record_info_path;
+			record_info_path << PARTTY_ARCHIVE_DIR;
+			record_info_path << static_cast<int64_t>(tv.tv_sec);
+			record_info_path << "-";
+			record_info_path.write(info.session_name, info.session_name_length);
+			record_info_path << "-info";
+
+			std::ofstream record_info(record_info_path.str().c_str());
+			record_info << "session-name: ";
+			record_info.write(info.session_name, info.session_name_length) << "\n";
+			record_info << "view-only-password: ";
+			record_info.write(info.readonly_password, info.readonly_password_length) << "\n";
+			record_info << "operation-password: ";
+			record_info.write(info.readonly_password, info.readonly_password_length) << "\n";
+			record_info.close();
+
+			std::ostringstream record_path;
+			record_path << PARTTY_ARCHIVE_DIR;
+			record_path << static_cast<int64_t>(tv.tv_sec);
+			record_path << "-";
+			record_path.write(info.session_name, info.session_name_length);
+
+			record = new std::ofstream( record_path.str().c_str() );
 		}
-		std::ostringstream record_path;
-		record_path << PARTTY_ARCHIVE_DIR;
-		record_path << static_cast<int64_t>(tv.tv_sec);
-		std::ofstream record( record_path.str().c_str() );
-		session_info_ref_t ref(info);
-		Multiplexer::config_t config(info.fd, gate, ref);
-		config.capture_stream = &record;
-		Multiplexer multiplexer(config);
-		if( sync_reply(fd, negotiation_reply::SUCCESS, "ok") < 0 ) {
-			throw io_error("sync reply failed");
+
+		try {
+			session_info_ref_t ref(info);
+			Multiplexer::config_t config(info.fd, gate, ref);
+			config.capture_stream = record;
+
+			Multiplexer multiplexer(config);
+			if( sync_reply(fd, negotiation_reply::SUCCESS, "ok") < 0 ) {
+				throw io_error("sync reply failed");
+			}
+	
+			std::cerr << "session ";
+			std::cerr.write(info.session_name, info.session_name_length);
+			std::cerr << " by ";
+			std::cerr.write(info.user_name, info.user_name_length);
+			std::cerr << std::endl;
+	
+			ret = multiplexer.run();
+		} catch (...) {
+			delete record;
+			throw;
 		}
-		std::cerr << "session ";
-		std::cerr.write(info.session_name, info.session_name_length);
-		std::cerr << " by ";
-		std::cerr.write(info.user_name, info.user_name_length);
-		std::cerr << std::endl;
-		ret = multiplexer.run();
+		delete record;
+
 	} catch (initialize_error& e) {
 		perror(e.what());
 		sync_reply(fd, negotiation_reply::SERVER_ERROR, e.what());

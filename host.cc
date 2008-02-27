@@ -30,8 +30,8 @@ Host::~Host() { delete impl; }
 HostIMPL::~HostIMPL() {}
 
 
-int Host::run(void) { return impl->run(); }
-int HostIMPL::run(void)
+int Host::run(char* cmd[]) { return impl->run(cmd); }
+int HostIMPL::run(char* cmd[])
 {
 	// Serverにヘッダを送る
 	negotiation_header_t header;
@@ -41,7 +41,7 @@ int HostIMPL::run(void)
 	header.protocol_version = PROTOCOL_VERSION;
 
 	// headerにはネットワークバイトオーダーで入れる
-	header.user_name_length    = htons(0);   // user_nameは今のところ空
+	header.user_name_length    = htons(m_info.user_name_length);
 	header.session_name_length = htons(m_info.session_name_length);
 	header.writable_password_length = htons(m_info.writable_password_length);
 	header.readonly_password_length = htons(m_info.readonly_password_length);
@@ -93,7 +93,7 @@ int HostIMPL::run(void)
 
 	// 新しい仮想端末を確保して、シェルを起動する
 	ptyshell psh(STDIN_FILENO);
-	if( psh.fork(NULL) < 0 ) { throw initialize_error("can't execute shell"); }
+	if( psh.fork(cmd) < 0 ) { throw initialize_error("can't execute shell"); }
 	sh = psh.masterfd();
 
 	// 標準入力をRawモードにする

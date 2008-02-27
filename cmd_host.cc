@@ -63,11 +63,12 @@ int main(int argc, char* argv[])
 		kz.on("-c", "--lock",      Accept::Character(lock_char), lock_char_set);
 		kz.break_parse(argc, argv);  // parse!
 
-		if( argc != 1 ) {
+		if( argc < 1 ) {
 			usage();
 			return 1;
 		}
 		Convert::FlexibleActiveHost(argv[0], saddr, Partty::SERVER_DEFAULT_PORT);
+		--argc, ++argv;
 
 		if( lock_char < 'a' ) {
 			lock_char += 32;  // shift
@@ -142,12 +143,19 @@ int main(int argc, char* argv[])
 	info.readonly_password = readonly_password.c_str();
 	info.readonly_password_length = readonly_password.length();
 
+	// 環境変数を設定
+	setenv(PARTTY_HOST_ENV_NAME, session_name.c_str(), 1);
+
 	// Host開始
 	try {
 		Partty::Host::config_t config(ssock, info);
 		config.lock_code = lock_char - 'a' + 1;;
 		Partty::Host host(config);
-		return host.run();
+		if( argc > 0 ) {
+			return host.run(argv);
+		} else {
+			return host.run(NULL);
+		}
 	} catch (Partty::partty_error& e) {
 		std::cerr << "error: " << e.what() << std::endl;
 		return 1;

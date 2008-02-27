@@ -45,6 +45,11 @@
 	">Partty! end"
 #endif
 
+#ifndef PARTTY_HOST_ENV_NAME
+#define PARTTY_HOST_ENV_NAME \
+	"PARTTY_SESSION"
+#endif
+
 
 #define PARTTY_RAW_GATE_FLASH_CROSS_DOMAIN_SUPPORT
 #ifndef PARTTY_RAW_GATE_FLASH_CROSS_DOMAIN_POLICY
@@ -281,7 +286,7 @@ public:
 public:
 	Host(config_t& config);
 	~Host();
-	int run(void);
+	int run(char* cmd[] = NULL);
 private:
 	HostIMPL* impl;
 	Host();

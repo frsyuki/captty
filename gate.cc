@@ -139,7 +139,7 @@ int GateIMPL::accept_guest(void)
 
 
 	// flush the buffer
-	if( write_message(td, guest, "\r\n", 1) < 0 ) {
+	if( write_message(td, guest, "\r\n", 2) < 0 ) {
 		return E_PASSWORD;
 	}
 

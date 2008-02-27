@@ -80,15 +80,15 @@ MultiplexerIMPL::MultiplexerIMPL(Multiplexer::config_t& config) :
 	char* exist;
 	for(delimiter = 0x3A; delimiter <= 0x7E; ++delimiter) {
 		// ':' - '~'
-		if( (exist = strchr(m_info.session_name, delimiter)) ) { break; }
+		if( !(exist = strchr(m_info.session_name, delimiter)) ) { break; }
 	}
-	if( !exist ) {
+	if( exist ) {
 		for(delimiter = 0x21; delimiter < 0x3A; ++delimiter) {
 			// '!' - '9'
-			if( (exist = strchr(m_info.session_name, delimiter)) ) { break; }
+			if( !(exist = strchr(m_info.session_name, delimiter)) ) { break; }
 		}
 	}
-	if( !exist ) { delimiter = 255; }
+	if( exist ) { delimiter = 255; }
 	setprocname("partty-session%c %s%c%s", delimiter, m_info.session_name, delimiter, m_info.user_name);
 }
 

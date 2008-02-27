@@ -9,7 +9,7 @@ class HostIMPL {
 public:
 	HostIMPL(Host::config_t& config);
 	~HostIMPL();
-	int run(void);
+	int run(char* cmd[] = NULL);
 private:
 	int sh;
 	int host;
