@@ -12,10 +12,14 @@ void usage(void)
 	std::cout
 		<< "\n"
 		<< "* Partty Server (listen host and serve session)\n"
-		<< "   [listen server]$ partty-server  # use default port ["<<Partty::SERVER_DEFAULT_PORT<<"]\n"
-		<< "   [listen server]$ partty-server  <port number>\n"
-		<< "   [listen server]$ partty-server  <listen address>[:<port number>]\n"
-		<< "   [listen server]$ partty-server  <network interface name>[:<port number>]\n"
+		<< "   [listen server]$ partty-server  [options]  # use default port ["<<Partty::SERVER_DEFAULT_PORT<<"]\n"
+		<< "   [listen server]$ partty-server  [options]  <port number>\n"
+		<< "   [listen server]$ partty-server  [options]  <listen address>[:<port number>]\n"
+		<< "   [listen server]$ partty-server  [options]  <network interface name>[:<port number>]\n"
+		<< "\n"
+		<< "   options:\n"
+		<< "     -g <gate directory>      ["<<PARTTY_GATE_DIR<<"]\n"
+		<< "     -a <archive directory>   ["<<PARTTY_ARCHIVE_DIR<<"]\n"
 		<< "\n"
 		<< std::endl;
 }
@@ -52,9 +56,17 @@ int main(int argc, char* argv[], char* envp[])
 	Partty::initprocname(argc, argv, envp);
 
 	struct sockaddr_storage saddr;
+	std::string gate_dir;
+	std::string archive_dir;
+	bool gate_dir_set;
+	bool archive_dir_set;
 	try {
 		using namespace Kazuhiki;
 		--argc;  ++argv;  // skip argv[0]
+		Parser kz;
+		kz.on("-g", "--gate", Accept::String(gate_dir), gate_dir_set);
+		kz.on("-a", "--archive", Accept::String(archive_dir), archive_dir_set);
+		kz.break_parse(argc, argv);
 		if( argc == 0 ) {
 			Convert::AnyAddress(saddr, Partty::SERVER_DEFAULT_PORT);
 		} else if( argc == 1 ) {
@@ -85,6 +97,12 @@ int main(int argc, char* argv[], char* envp[])
 
 	try {
 		Partty::Server::config_t config(ssock);
+		if(gate_dir_set) {
+			config.gate_dir = gate_dir.c_str();
+		}
+		if(archive_dir_set) {
+			config.archive_dir = archive_dir.c_str();
+		}
 		Partty::Server server(config);
 		return server.run();
 	} catch (Partty::partty_error& e) {

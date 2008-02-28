@@ -1,5 +1,6 @@
 #include "partty.h"
 #include "emtelnet.h"
+#include <string>
 
 namespace Partty {
 
@@ -28,6 +29,8 @@ private:
 	int socket;
 	char gate_path[PATH_MAX + MAX_SESSION_NAME_LENGTH];
 	size_t gate_dir_len;
+	std::string m_session_banner;
+	std::string m_password_banner;
 	sig_atomic_t m_end;
 private:
 	GateIMPL();

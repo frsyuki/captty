@@ -37,13 +37,16 @@ phrase_telnetd::phrase_telnetd() : emtelnet((void*)this) {
 Gate::Gate(config_t& config) : impl(new GateIMPL(config)) {}
 
 GateIMPL::GateIMPL(Gate::config_t& config) :
-		socket(config.listen_socket), m_end(0)
+		socket(config.listen_socket),
+		m_session_banner(config.session_banner),
+		m_password_banner(config.password_banner),
+		m_end(0)
 {
-	gate_dir_len = strlen(GATE_DIR);
+	gate_dir_len = strlen(config.gate_dir);
 	if( gate_dir_len > PATH_MAX ) {
 		throw initialize_error("gate directory path is too long");
 	}
-	memcpy(gate_path, GATE_DIR, gate_dir_len);
+	memcpy(gate_path, config.gate_dir, gate_dir_len);
 	// この時点ではgate_pathにはNULL終端が付いていない
 }
 
@@ -112,8 +115,8 @@ int GateIMPL::accept_guest(void)
 	//td.send_wont(emtelnet::OPT_ECHO);
 	//td.send_will(emtelnet::OPT_LINEMODE);
 	//td.send_do(emtelnet::OPT_LINEMODE);
-	if( write_message(td, guest, GATE_SESSION_BANNER,
-				strlen(GATE_SESSION_BANNER)) < 0 ) {
+	if( write_message(td, guest, m_session_banner.c_str(),
+				m_session_banner.length()) < 0 ) {
 		return E_SESSION_NAME;
 	}
 	rl = read_line(td, guest, msg.session_name.str, MAX_SESSION_NAME_LENGTH);
@@ -127,8 +130,8 @@ int GateIMPL::accept_guest(void)
 	//td.send_wont(emtelnet::OPT_ECHO);
 	td.send_will(emtelnet::OPT_ECHO);
 	td.send_dont(emtelnet::OPT_ECHO);
-	if( write_message(td, guest, GATE_PASSWORD_BANNER,
-				strlen(GATE_PASSWORD_BANNER)) < 0 ) {
+	if( write_message(td, guest, m_password_banner.c_str(),
+				m_password_banner.length()) < 0 ) {
 		return E_PASSWORD;
 	}
 	rl = read_line(td, guest, msg.password.str, MAX_PASSWORD_LENGTH);

@@ -14,6 +14,7 @@ void usage(void)
 		<< "\n"
 		<< "   options:\n"
 		<< "     -r                       use raw mode instead of telnet\n"
+		<< "     -g <gate directory>      ["<<PARTTY_GATE_DIR<<"]\n"
 		<< "\n"
 		<< std::endl;
 }
@@ -48,11 +49,14 @@ int main(int argc, char* argv[])
 {
 	struct sockaddr_storage saddr;
 	bool use_raw = false;
+	std::string gate_dir;
+	bool gate_dir_set;
 	try {
 		using namespace Kazuhiki;
 		Parser kz;
 		--argc;  ++argv;  // skip argv[0]
-		kz.on("-r", "--raw", Accept::Boolean(use_raw));
+		kz.on("-r", "--raw",  Accept::Boolean(use_raw));
+		kz.on("-g", "--gate", Accept::String(gate_dir), gate_dir_set);
 		kz.break_parse(argc, argv);
 		if( argc == 0 ) {
 			Convert::AnyAddress(saddr, Partty::GATE_DEFAULT_PORT);
@@ -75,12 +79,18 @@ int main(int argc, char* argv[])
 	}
 
 	try {
-		if( use_raw ) {
+		if(use_raw) {
 			Partty::RawGate::config_t config(ssock);
+			if(gate_dir_set) {
+				config.gate_dir = gate_dir.c_str();
+			}
 			Partty::RawGate gate(config);
 			return gate.run();
 		} else {
 			Partty::Gate::config_t config(ssock);
+			if(gate_dir_set) {
+				config.gate_dir = gate_dir.c_str();
+			}
 			Partty::Gate gate(config);
 			return gate.run();
 		}

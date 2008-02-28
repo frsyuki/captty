@@ -41,7 +41,7 @@ int HostIMPL::run(char* cmd[])
 	header.protocol_version = PROTOCOL_VERSION;
 
 	// headerにはネットワークバイトオーダーで入れる
-	header.user_name_length    = htons(m_info.user_name_length);
+	header.message_length    = htons(m_info.message_length);
 	header.session_name_length = htons(m_info.session_name_length);
 	header.writable_password_length = htons(m_info.writable_password_length);
 	header.readonly_password_length = htons(m_info.readonly_password_length);
@@ -49,8 +49,8 @@ int HostIMPL::run(char* cmd[])
 	if( write_all(server, &header, sizeof(header)) != sizeof(header) ) {
 		throw initialize_error("failed to send negotiation header");
 	}
-	// user_name
-	if( write_all(server, &m_info.user_name, m_info.user_name_length) != m_info.user_name_length ) {
+	// message
+	if( write_all(server, &m_info.message, m_info.message_length) != m_info.message_length ) {
 		throw initialize_error("failed to send user name");
 	}
 	// session_name

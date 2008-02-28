@@ -20,7 +20,15 @@ Server::Server(config_t& config) :
 	impl(new ServerIMPL(config)) {}
 
 ServerIMPL::ServerIMPL(Server::config_t& config) :
-	sock(config.listen_socket) {}
+	sock(config.listen_socket),
+	m_archive_dir(config.archive_dir)
+{
+	gate_dir_len = strlen(config.gate_dir);
+	if( gate_dir_len > PATH_MAX ) {
+		throw initialize_error("gate directory path is too long");
+	}
+	memcpy(gate_path, config.gate_dir, gate_dir_len);
+}
 
 
 Server::~Server() { delete impl; }
@@ -143,7 +151,7 @@ int Lobby::io_payload(mpio& mp, int fd, void* buf, size_t just, size_t len)
 	}
 
 	// ここでエンディアンを直す
-	header->user_name_length = ntohs(header->user_name_length);
+	header->message_length = ntohs(header->message_length);
 	header->session_name_length = ntohs(header->session_name_length);
 	header->writable_password_length = ntohs(header->writable_password_length);
 	header->readonly_password_length = ntohs(header->readonly_password_length);
@@ -154,7 +162,7 @@ int Lobby::io_payload(mpio& mp, int fd, void* buf, size_t just, size_t len)
 		return 0;
 	}
 
-	if( header->user_name_length    > MAX_USER_NAME_LENGTH     ||
+	if( header->message_length    > MAX_MESSAGE_LENGTH     ||
 	    header->session_name_length > MAX_SESSION_NAME_LENGTH  ||
 	    header->session_name_length < MIN_SESSION_NAME_LENGTH  ||
 	    header->writable_password_length > MAX_PASSWORD_LENGTH ||
@@ -167,7 +175,7 @@ int Lobby::io_payload(mpio& mp, int fd, void* buf, size_t just, size_t len)
 
 	using namespace mp::placeholders;
 	if( mp::ios::ios_read_just(mp, fd, (char*)buf + sizeof(negotiation_header_t),
-			header->user_name_length +
+			header->message_length +
 				header->session_name_length +
 				header->writable_password_length +
 				header->readonly_password_length,
@@ -225,29 +233,29 @@ int Lobby::io_fork(mpio& mp, int fd, void* payload, size_t just, size_t len)
 
 	next_host->fd = fd;
 
-	next_host->user_name_length = header->user_name_length;
+	next_host->message_length = header->message_length;
 	next_host->session_name_length = header->session_name_length;
 	next_host->writable_password_length = header->writable_password_length;
 	next_host->readonly_password_length = header->readonly_password_length;
 
-	std::memcpy( next_host->user_name,
+	std::memcpy( next_host->message,
 		     payload,
-		     header->user_name_length);
-	next_host->user_name[header->user_name_length] = '\0';
+		     header->message_length);
+	next_host->message[header->message_length] = '\0';
 
 	std::memcpy( next_host->session_name,
-		     (char*)payload + next_host->user_name_length,
+		     (char*)payload + next_host->message_length,
 		     header->session_name_length);
 	next_host->session_name[header->session_name_length] = '\0';
 
 	std::memcpy( next_host->writable_password,
-		     (char*)payload + next_host->user_name_length
+		     (char*)payload + next_host->message_length
 				    + next_host->session_name_length,
 		     header->writable_password_length);
 	next_host->writable_password[header->writable_password_length] = '\0';
 
 	std::memcpy( next_host->readonly_password,
-		     (char*)payload + next_host->user_name_length
+		     (char*)payload + next_host->message_length
 				    + next_host->session_name_length
 				    + next_host->readonly_password_length,
 		     header->readonly_password_length);
@@ -298,9 +306,6 @@ int ServerIMPL::sync_reply(int fd, uint16_t code, const char* message, size_t me
 
 int ServerIMPL::run_multiplexer(host_info_t& info)
 {
-	char gate_path[PATH_MAX + Partty::MAX_SESSION_NAME_LENGTH];
-	ssize_t gate_dir_len = strlen(Partty::GATE_DIR);
-	memcpy(gate_path, Partty::GATE_DIR, gate_dir_len);
 	memcpy(gate_path + gate_dir_len, info.session_name, info.session_name_length);
 	gate_path[gate_dir_len + info.session_name_length] = '\0';
 
@@ -337,7 +342,7 @@ int ServerIMPL::run_multiplexer(host_info_t& info)
 			}
 
 			std::ostringstream record_info_path;
-			record_info_path << PARTTY_ARCHIVE_DIR;
+			record_info_path << m_archive_dir;
 			record_info_path << static_cast<int64_t>(tv.tv_sec);
 			record_info_path << "-";
 			record_info_path.write(info.session_name, info.session_name_length);
@@ -353,7 +358,7 @@ int ServerIMPL::run_multiplexer(host_info_t& info)
 			record_info.close();
 
 			std::ostringstream record_path;
-			record_path << PARTTY_ARCHIVE_DIR;
+			record_path << m_archive_dir;
 			record_path << static_cast<int64_t>(tv.tv_sec);
 			record_path << "-";
 			record_path.write(info.session_name, info.session_name_length);
@@ -373,8 +378,8 @@ int ServerIMPL::run_multiplexer(host_info_t& info)
 	
 			std::cerr << "session ";
 			std::cerr.write(info.session_name, info.session_name_length);
-			std::cerr << " by ";
-			std::cerr.write(info.user_name, info.user_name_length);
+			std::cerr << " : ";
+			std::cerr.write(info.message, info.message_length);
 			std::cerr << std::endl;
 	
 			ret = multiplexer.run();

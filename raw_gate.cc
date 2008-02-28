@@ -17,13 +17,17 @@ namespace Partty {
 RawGate::RawGate(config_t& config) : impl(new RawGateIMPL(config)) {}
 
 RawGateIMPL::RawGateIMPL(RawGate::config_t& config) :
-		socket(config.listen_socket), m_end(0)
+		socket(config.listen_socket),
+#ifdef PARTTY_RAW_GATE_FLASH_CROSS_DOMAIN_SUPPORT
+		m_flash_cross_domain_policy(config.flash_cross_domain_policy),
+#endif
+		m_end(0)
 {
-	gate_dir_len = strlen(GATE_DIR);
+	gate_dir_len = strlen(config.gate_dir);
 	if( gate_dir_len > PATH_MAX ) {
 		throw initialize_error("gate directory path is too long");
 	}
-	memcpy(gate_path, GATE_DIR, gate_dir_len);
+	memcpy(gate_path, config.gate_dir, gate_dir_len);
 	// この時点ではgate_pathにはNULL終端が付いていない
 }
 
@@ -106,7 +110,7 @@ int RawGateIMPL::accept_guest(void)
 		}
 #ifdef PARTTY_RAW_GATE_FLASH_CROSS_DOMAIN_SUPPORT
 		if( num_zero > 0 && strcmp("<policy-file-request/>", buf) == 0 ) {
-			write_all(guest, PARTTY_RAW_GATE_FLASH_CROSS_DOMAIN_POLICY, strlen(PARTTY_RAW_GATE_FLASH_CROSS_DOMAIN_POLICY)+1);   // NULL終端も送る
+			write_all(guest, m_flash_cross_domain_policy.c_str(), m_flash_cross_domain_policy.length()+1);   // NULL終端も送る
 			close(guest);
 			return E_FLASH_CROSS_DOMAIN;
 		}

@@ -32,7 +32,7 @@ void usage(void)
 		<< "\n"
 		<< "   options:\n"
 		<< "     -s <session name>        session name\n"
-		<< "     -u <user name>           user name ["<<getusername()<<"]\n"
+		<< "     -m <message>             message in a word ["<<getusername()<<"]\n"
 		<< "     -w <oparation password>  password to operate the session\n"
 		<< "     -r <view-only password>  password to view the session\n"
 		<< "     -c <lock character>      control key to lock guest operation (default: ']')\n"
@@ -45,10 +45,12 @@ void usage(void)
 int main(int argc, char* argv[])
 {
 	std::string session_name;
+	std::string message;
 	std::string writable_password;
 	std::string readonly_password;
 	char lock_char = ']';
 	bool session_name_set;
+	bool message_set;
 	bool writable_password_set;
 	bool readonly_password_set;
 	bool lock_char_set;
@@ -58,6 +60,7 @@ int main(int argc, char* argv[])
 		Parser kz;
 		--argc;  ++argv;  // skip argv[0]
 		kz.on("-s", "--session",   Accept::String(session_name), session_name_set);
+		kz.on("-m", "--message",   Accept::String(message), message_set);
 		kz.on("-w", "--password",  Accept::String(writable_password), writable_password_set);
 		kz.on("-r", "--view-only", Accept::String(readonly_password), readonly_password_set);
 		kz.on("-c", "--lock",      Accept::Character(lock_char), lock_char_set);
@@ -85,7 +88,7 @@ int main(int argc, char* argv[])
 
 	// セッション名チェック
 	if( !session_name_set ) {
-		char sbuf[Partty::MAX_USER_NAME_LENGTH+2];  // 長さ超過を検知するために+2
+		char sbuf[Partty::MAX_SESSION_NAME_LENGTH+2];  // 長さ超過を検知するために+2
 		std::cerr << "Session name: " << std::flush;
 		std::cin.getline(sbuf, sizeof(sbuf));
 		session_name = sbuf;
@@ -119,6 +122,15 @@ int main(int argc, char* argv[])
 	}
 
 
+	// メッセージをチェック
+	if( !message_set ) {
+		message = getusername();
+	}
+	if( message.length() > Partty::MAX_MESSAGE_LENGTH ) {
+		std::cerr << "Message is too long" << std::endl;
+		return 1;
+	}
+
 	// ソケットをlisten
 	int ssock = socket(saddr.ss_family, SOCK_STREAM, 0);
 	if( ssock < 0 ) {
@@ -134,13 +146,13 @@ int main(int argc, char* argv[])
 	}
 
 	Partty::session_info_ref_t info;
-	info.user_name = getusername();
-	info.user_name_length = std::strlen(info.user_name);
-	info.session_name = session_name.c_str();
-	info.session_name_length = session_name.length();
-	info.writable_password = writable_password.c_str();
+	info.message                  = message.c_str();
+	info.message_length           = message.length();
+	info.session_name             = session_name.c_str();
+	info.session_name_length      = session_name.length();
+	info.writable_password        = writable_password.c_str();
 	info.writable_password_length = writable_password.length();
-	info.readonly_password = readonly_password.c_str();
+	info.readonly_password        = readonly_password.c_str();
 	info.readonly_password_length = readonly_password.length();
 
 	// 環境変数を設定

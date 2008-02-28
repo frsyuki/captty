@@ -67,13 +67,9 @@ static const unsigned short GATE_DEFAULT_PORT     = 7777;
 static const size_t MAX_SESSION_NAME_LENGTH = 128;
 static const size_t MIN_SESSION_NAME_LENGTH = 3;
 static const size_t MAX_PASSWORD_LENGTH     = 128;
-static const size_t MAX_USER_NAME_LENGTH    = 128;
+static const size_t MAX_MESSAGE_LENGTH    = 128;
 
 
-static const char* const GATE_DIR = PARTTY_GATE_DIR;
-static const char* const ARCHIVE_DIR = PARTTY_ARCHIVE_DIR;
-static const char* const GATE_PASSWORD_BANNER = PARTTY_GATE_PASSWORD_BANNER;
-static const char* const GATE_SESSION_BANNER = PARTTY_GATE_SESSION_BANNER;
 static const char* const SERVER_WELCOME_MESSAGE = PARTTY_SERVER_WELCOME_MESSAGE;
 static const char* const SESSION_START_MESSAGE = PARTTY_SESSION_START_MESSAGE;
 static const char* const SESSION_END_MESSAGE = PARTTY_SESSION_END_MESSAGE;
@@ -87,11 +83,11 @@ static const size_t NEGOTIATION_MAGIC_STRING_LENGTH = 7;
 struct negotiation_header_t {
 	char magic[NEGOTIATION_MAGIC_STRING_LENGTH];  // "Partty!"
 	uint8_t protocol_version;
-	uint16_t user_name_length;
+	uint16_t message_length;
 	uint16_t session_name_length;
 	uint16_t writable_password_length;
 	uint16_t readonly_password_length;
-	// char user_name[user_name_length];
+	// char message[message_length];
 	// char session_name[session_name_length];
 	// char writable_password[writable_password_length];
 	// char readonly_password[readonly_password_length];
@@ -136,11 +132,11 @@ struct session_info_t;
 struct session_info_ref_t {
 	explicit inline session_info_ref_t(const session_info_t& src);
 	session_info_ref_t() {}
-	uint16_t user_name_length;
+	uint16_t message_length;
 	uint16_t session_name_length;
 	uint16_t writable_password_length;
 	uint16_t readonly_password_length;
-	const char* user_name;
+	const char* message;
 	const char* session_name;
 	const char* writable_password;
 	const char* readonly_password;
@@ -149,34 +145,34 @@ struct session_info_ref_t {
 struct session_info_t {
 	explicit inline session_info_t(const session_info_ref_t& ref);
 	session_info_t() {}
-	uint16_t user_name_length;
+	uint16_t message_length;
 	uint16_t session_name_length;
 	uint16_t writable_password_length;
 	uint16_t readonly_password_length;
-	char user_name[MAX_USER_NAME_LENGTH];
+	char message[MAX_MESSAGE_LENGTH];
 	char session_name[MAX_SESSION_NAME_LENGTH];
 	char writable_password[MAX_PASSWORD_LENGTH];
 	char readonly_password[MAX_PASSWORD_LENGTH];
 };
 
 session_info_ref_t::session_info_ref_t(const session_info_t& src) :
-	user_name_length         (src.user_name_length        ),
+	message_length           (src.message_length          ),
 	session_name_length      (src.session_name_length     ),
 	readonly_password_length (src.readonly_password_length),
 	writable_password_length (src.writable_password_length),
-	user_name                (src.user_name               ),
+	message                  (src.message                 ),
 	session_name             (src.session_name            ),
 	readonly_password        (src.readonly_password       ),
 	writable_password        (src.writable_password       ) {}
 
 session_info_t::session_info_t(const session_info_ref_t& ref) :
-	user_name_length         (ref.user_name_length        ),
+	message_length           (ref.message_length          ),
 	session_name_length      (ref.session_name_length     ),
 	writable_password_length (ref.writable_password_length),
 	readonly_password_length (ref.readonly_password_length)
 {
-	if( user_name_length > MAX_USER_NAME_LENGTH ) {
-		throw initialize_error("user name is too long");
+	if( message_length > MAX_MESSAGE_LENGTH ) {
+		throw initialize_error("message is too long");
 	}
 	if( session_name_length > MAX_SESSION_NAME_LENGTH ) {
 		throw initialize_error("session name is too long");
@@ -190,7 +186,7 @@ session_info_t::session_info_t(const session_info_ref_t& ref) :
 	if( readonly_password_length > MAX_PASSWORD_LENGTH ) {
 		throw initialize_error("view-only password is too long");
 	}
-	std::memcpy(user_name,         ref.user_name,         ref.user_name_length);
+	std::memcpy(message,           ref.message,           ref.message_length);
 	std::memcpy(session_name,      ref.session_name,      ref.session_name_length);
 	std::memcpy(writable_password, ref.writable_password, ref.writable_password_length);
 	std::memcpy(readonly_password, ref.readonly_password, ref.readonly_password_length);
@@ -214,7 +210,12 @@ class Server {
 public:
 	struct config_t {
 		config_t(int listen_socket_) :
+			gate_dir(PARTTY_GATE_DIR),
+			archive_dir(PARTTY_ARCHIVE_DIR),
 			listen_socket(listen_socket_) {}
+	public:
+		const char* gate_dir;
+		const char* archive_dir;
 	private:
 		int listen_socket;
 		friend class ServerIMPL;
@@ -301,8 +302,14 @@ class Gate {
 public:
 	struct config_t {
 		config_t(int listen_socket_) :
+			gate_dir(PARTTY_GATE_DIR),
+			session_banner(PARTTY_GATE_SESSION_BANNER),
+			password_banner(PARTTY_GATE_PASSWORD_BANNER),
 			listen_socket(listen_socket_) {}
 	public:
+		const char* gate_dir;
+		const char* session_banner;
+		const char* password_banner;
 	private:
 		int listen_socket;
 		friend class GateIMPL;
@@ -327,8 +334,16 @@ class RawGate {
 public:
 	struct config_t {
 		config_t(int listen_socket_) :
+			gate_dir(PARTTY_GATE_DIR),
+#ifdef PARTTY_RAW_GATE_FLASH_CROSS_DOMAIN_SUPPORT
+			flash_cross_domain_policy(PARTTY_RAW_GATE_FLASH_CROSS_DOMAIN_POLICY),
+#endif
 			listen_socket(listen_socket_) {}
 	public:
+		const char* gate_dir;
+#ifdef PARTTY_RAW_GATE_FLASH_CROSS_DOMAIN_SUPPORT
+		const char* flash_cross_domain_policy;
+#endif
 	private:
 		int listen_socket;
 		friend class RawGateIMPL;

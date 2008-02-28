@@ -1,4 +1,5 @@
 #include "partty.h"
+#include <string>
 
 namespace Partty {
 
@@ -15,6 +16,9 @@ private:
 	int socket;
 	char gate_path[PATH_MAX + MAX_SESSION_NAME_LENGTH];
 	size_t gate_dir_len;
+#ifdef PARTTY_RAW_GATE_FLASH_CROSS_DOMAIN_SUPPORT
+	std::string m_flash_cross_domain_policy;
+#endif
 	sig_atomic_t m_end;
 private:
 	RawGateIMPL();
@@ -34,5 +38,4 @@ private:
 
 
 }  // namespace Partty
-
 

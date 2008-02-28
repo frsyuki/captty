@@ -89,7 +89,7 @@ MultiplexerIMPL::MultiplexerIMPL(Multiplexer::config_t& config) :
 		}
 	}
 	if( exist ) { delimiter = 255; }
-	setprocname("partty-session%c %s%c%s", delimiter, m_info.session_name, delimiter, m_info.user_name);
+	setprocname("partty-session%c %s%c%s", delimiter, m_info.session_name, delimiter, m_info.message);
 }
 
 
@@ -189,8 +189,8 @@ read(gate, trash, sizeof(trash));  // FIXME データがあった場合は捨て
 		return 0;
 	}
 	guest_set.set(guest);
-	// 書き込み待ちバッファにPARTTY_SERVER_WELCOME_MESSAGEを加える
-	guest_set.data(guest).send(PARTTY_SERVER_WELCOME_MESSAGE, strlen(PARTTY_SERVER_WELCOME_MESSAGE), NULL);
+	// 書き込み待ちバッファにSERVER_WELCOME_MESSAGEを加える
+	guest_set.data(guest).send(SERVER_WELCOME_MESSAGE, strlen(SERVER_WELCOME_MESSAGE), NULL);
 	num_guest++;
 	return 0;
 }

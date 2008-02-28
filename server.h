@@ -17,7 +17,7 @@ public:
 private:
 	static const size_t BUFFER_SIZE =
 			sizeof(negotiation_header_t) +
-			MAX_USER_NAME_LENGTH +
+			MAX_MESSAGE_LENGTH +
 			MAX_SESSION_NAME_LENGTH +
 			MAX_PASSWORD_LENGTH ;
 	struct data_t {
@@ -63,6 +63,9 @@ public:
 	int run(void);
 private:
 	int sock;
+	char gate_path[PATH_MAX + MAX_SESSION_NAME_LENGTH];
+	size_t gate_dir_len;
+	std::string m_archive_dir;
 private:
 	int sync_reply(int fd, uint16_t code, const char* message);
 	int sync_reply(int fd, uint16_t code, const char* message, size_t message_length);
