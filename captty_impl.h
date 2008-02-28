@@ -112,6 +112,7 @@ private:
 	double m_speed;
 	bool m_skip_mode;
 	bool m_skip_block;
+	bool m_rewait_frame;
 	bool m_quit;
 	void (*m_handler)(int, void*);
 	void* m_handler_data;

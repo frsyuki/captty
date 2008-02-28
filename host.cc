@@ -205,7 +205,6 @@ int HostIMPL::io_shell(int fd, short event)
 	// ブロックしながら標準出力に書き込む
 	// STDOUT_FILENOはblocking mode
 	if( write_all(STDOUT_FILENO, shared_buffer, len) != (size_t)len ) {
-		perror("hogehoge");
 		throw io_error("stdoutput is broken");
 	}
 	// ブロックしながらServerに書き込む

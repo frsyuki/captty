@@ -318,11 +318,12 @@ PlayerIMPL::PlayerIMPL(std::istream& input) :
 	m_speed(1.0),
 	m_skip_mode(false),
 	m_skip_block(false),
+	m_rewait_frame(false),
 	m_quit(false),
 	m_handler(NULL),
 	m_handler_data(NULL)
 {
-	char buf[ MAX_BLOCK_SIZE  + BLOCK::HEADER_SIZE ];
+	char buf[BLOCK::HEADER_SIZE];
 	while( m_file.read(buf, BLOCK::HEADER_SIZE).good() ) {
 		uint16_t btdiff = letohs( *(uint16_t*)buf );
 		//uint8_t& bflag( *(uint8_t*)(buf + sizeof(uint16_t)) );
@@ -351,15 +352,14 @@ void PlayerIMPL::play()
 
 	scoped_window_save scoped_ws(STDIN_FILENO);
 
-	char buf[1<<16];
+	char buf[MAX_BLOCK_SIZE + BLOCK::HEADER_SIZE];
 	char zbuf[MAX_BLOCK_SIZE];
 	size_t zlen;
 	while( m_file.read(buf, BLOCK::HEADER_SIZE).good() && !m_quit ) {
 		//uint16_t btdiff = letohs( *(uint16_t*)buf );
 		uint8_t& bflag( *(uint8_t*)(buf + sizeof(uint16_t)) );
 		uint32_t blength = letohl( *(uint32_t*)(buf + sizeof(uint8_t) + sizeof(uint16_t)) );
-		if( blength > (sizeof(buf) - BLOCK::HEADER_SIZE) ) {
-			std::cerr << blength << std::endl;
+		if( blength > MAX_BLOCK_SIZE ) {
 			throw io_error("invalid block length");
 		}
 		if( !m_file.read(buf+BLOCK::HEADER_SIZE, blength).good() ) {
@@ -410,7 +410,7 @@ bool PlayerIMPL::play_block(const char* pos, const char* const endpos)
 			tv.tv_usec = 0;
 		} else {
 			double d = ftdiff / m_speed;
-			ftdiff = std::min(d, (double)std::numeric_limits<uint32_t>::max());
+			ftdiff = static_cast<uint32_t>( std::min( d, static_cast<double>(std::numeric_limits<uint32_t>::max()) ) );
 			tv.tv_sec  = ftdiff / (1000 * 1000);
 			tv.tv_usec = ftdiff % (1000 * 1000);
 		}
@@ -435,6 +435,9 @@ bool PlayerIMPL::play_block(const char* pos, const char* const endpos)
 				if( m_skip_block ) {
 					m_skip_block = false;
 					return true;
+				} else if( m_rewait_frame ) {
+					m_rewait_frame = false;
+					continue;
 				}
 			}
 		}
@@ -509,13 +512,13 @@ void Player::skip_forward() { impl->skip_forward(); }
 void PlayerIMPL::skip_forward()
 {
 	m_skip_mode = true;
-	clear_display();
 }
 
 void Player::pause() { impl->pause(); }
 void PlayerIMPL::pause()
 {
 	m_speed = std::numeric_limits<double>::min();
+	m_rewait_frame = true;
 }
 
 void Player::toggle_pause() { impl->toggle_pause(); }
@@ -525,6 +528,7 @@ void PlayerIMPL::toggle_pause()
 		m_speed = 1.0;
 	} else {
 		m_speed = std::numeric_limits<double>::min();
+		m_rewait_frame = true;
 	}
 }
 

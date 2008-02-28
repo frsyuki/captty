@@ -108,6 +108,96 @@ inline uint16_t letohs(uint16_t x) { return htoles(x); }
 inline uint32_t letohl(uint32_t x) { return htolel(x); }
 
 
+
+/**
+ * File format
+ * ===========
+ * +----+----+----+
+ * |    |    |    | ...
+ * +----+----+----+
+ * Block
+ *      Block
+ *           Block
+ *                ...
+ *
+ *
+ * Block format
+ * ============
+ * +--+-+----+--------+
+ * |16|8| 32 |        |
+ * +--+-+----+--------+
+ * time
+ *    flag
+ *      length
+ *           frames
+ *
+ * time:    elapsed time since previous block
+ *          in seconds
+ *
+ * flag:    BLOCK::COMPRESSED_FRAMES:
+ *            following data is compressed frames
+ *            compression algorithm is deflate
+ *
+ *          BLOCK::UNCOMPRESSED_FRAMES:
+ *            following data is uncompressed frames
+ *
+ * length:  length of following data in bytes
+ *          maximum is MAX_BLOCK_SIZE
+ *
+ *
+ * Frames format
+ * =============
+ * +----+----+----+
+ * |    |    |    | ...
+ * +----+----+----+
+ * Frame
+ *      Frame
+ *           Frame
+ *                ...
+ *
+ *
+ * Frame format
+ * ============
+ * +----+-+--+--------+
+ * | 32 |8|16|        |
+ * +----+-+--+--------+
+ * time
+ *      flag
+ *        length
+ *           data
+ *
+ * time:    elapsed time since previous frame
+ *          in microseconds
+ *
+ * flag:    FRAME::OUTPUT
+ *            following data is Terminal Output
+ *
+ *          FRAME::WINDOW_SIZE
+ *            following data is Window Size
+ *
+ * length:  length of following data in bytes
+ *          maximum is 1<<16
+ *
+ *
+ * Terminal Output Format
+ * ======================
+ * +--------+
+ * |        |
+ * +--------+
+ * data
+ *
+ *
+ * Window Size Format
+ * ==================
+ * +--+--+
+ * |16|16|
+ * +--+--+
+ * number of rows
+ *    number of columns
+ *
+ */
+
+
 }  // namespace Captty
 
 #endif /* captty.h */
