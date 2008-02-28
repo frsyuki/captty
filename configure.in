@@ -2,8 +2,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT(partty, 0.2.6, fr _at_ syuki.skr.jp)
-AM_INIT_AUTOMAKE(partty, 0.2.6)
+AC_INIT(partty, 0.2.7, fr _at_ syuki.skr.jp)
+AM_INIT_AUTOMAKE(partty, 0.2.7)
 AC_CONFIG_SRCDIR(partty.h)
 AC_CONFIG_HEADER(config.h)
 
@@ -49,5 +49,5 @@ AC_FUNC_REALLOC
 AC_FUNC_SELECT_ARGTYPES
 AC_CHECK_FUNCS([dup2 getpass gettimeofday memmove memset select socket strchr strrchr])
 
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([Makefile partty.spec])
 AC_OUTPUT
