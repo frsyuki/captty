@@ -21,6 +21,7 @@ RawGateIMPL::RawGateIMPL(RawGate::config_t& config) :
 #ifdef PARTTY_RAW_GATE_FLASH_CROSS_DOMAIN_SUPPORT
 		m_flash_cross_domain_policy(config.flash_cross_domain_policy),
 #endif
+		m_parent_pid(getpid()),
 		m_end(0)
 {
 	gate_dir_len = strlen(config.gate_dir);
@@ -80,6 +81,10 @@ int RawGateIMPL::run(void)
 
 	return 0;
 }
+
+
+void RawGate::signal_end(void) { impl->signal_end(); }
+void RawGateIMPL::signal_end(void) { m_end = 1; }
 
 
 int RawGateIMPL::accept_guest(void)

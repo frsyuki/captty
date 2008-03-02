@@ -17,7 +17,7 @@
 
 #ifndef PARTTY_ARCHIVE_DIR
 #define PARTTY_ARCHIVE_DIR \
-	"./var/archive/"
+	"./var/archive"
 #endif
 
 #ifndef PARTTY_GATE_SESSION_BANNER
@@ -225,6 +225,7 @@ public:
 	Server(config_t& config);
 	~Server();
 	int run(void);
+	void signal_end(void);
 private:
 	ServerIMPL* impl;
 	Server();

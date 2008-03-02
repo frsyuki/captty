@@ -61,11 +61,13 @@ public:
 	ServerIMPL(Server::config_t& config);
 	~ServerIMPL();
 	int run(void);
+	void signal_end(void);
 private:
 	int sock;
 	char gate_path[PATH_MAX + MAX_SESSION_NAME_LENGTH];
 	size_t gate_dir_len;
 	std::string m_archive_dir;
+	sig_atomic_t m_end;
 private:
 	int sync_reply(int fd, uint16_t code, const char* message);
 	int sync_reply(int fd, uint16_t code, const char* message, size_t message_length);

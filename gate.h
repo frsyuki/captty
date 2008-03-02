@@ -31,6 +31,7 @@ private:
 	size_t gate_dir_len;
 	std::string m_session_banner;
 	std::string m_password_banner;
+	pid_t m_parent_pid;
 	sig_atomic_t m_end;
 private:
 	GateIMPL();

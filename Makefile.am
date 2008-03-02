@@ -1,6 +1,6 @@
 bin_PROGRAMS = partty-host partty-server partty-gate partty-scale captty
 
-partty_host_SOURCES = host.cc cmd_host.cc ptyshell.cc
+partty_host_SOURCES = host.cc cmd_host.cc ptyshell.cc emtelnet.cc
 partty_server_SOURCES = server.cc emtelnet.cc multiplexer.cc cmd_server.cc uniext.cc captty.cc
 partty_server_LDFLAGS = -lz
 partty_gate_SOURCES = gate.cc raw_gate.cc emtelnet.cc cmd_gate.cc

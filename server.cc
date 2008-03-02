@@ -7,9 +7,11 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <arpa/inet.h>
+#include <time.h>
 #include <fcntl.h>
 #include <fstream>
 #include <sstream>
+#include <iomanip>
 #include "uniext.h"
 #include "fdtransport.h"
 
@@ -21,7 +23,8 @@ Server::Server(config_t& config) :
 
 ServerIMPL::ServerIMPL(Server::config_t& config) :
 	sock(config.listen_socket),
-	m_archive_dir(config.archive_dir)
+	m_archive_dir(config.archive_dir),
+	m_end(0)
 {
 	gate_dir_len = strlen(config.gate_dir);
 	if( gate_dir_len > PATH_MAX ) {
@@ -64,8 +67,7 @@ int ServerIMPL::run(void)
 
 	pid_t pid;
 	ScopedLobby lobby(sock);
-	while(1) {
-	// FIXME シグナルハンドラ
+	while(!m_end) {
 		int ret = lobby.next(info);
 		if( ret < 0 ) {
 			perror("multiplexer is broken");
@@ -87,6 +89,9 @@ int ServerIMPL::run(void)
 	}
 }
 
+void Server::signal_end(void) { impl->signal_end(); }
+void ServerIMPL::signal_end(void) { m_end = 1; }
+
 void ScopedLobby::forked_destroy(int fd)
 {
 	impl->forked_destroy(fd);
@@ -104,7 +109,6 @@ void Lobby::forked_destroy(int fd)
 		}
 	}
 }
-
 
 
 int Lobby::next(host_info_t& info)
@@ -336,15 +340,27 @@ int ServerIMPL::run_multiplexer(host_info_t& info)
 	try {
 		std::ofstream* record = NULL;
 		{
-			struct timeval tv;
-			if( gettimeofday(&tv, NULL) < 0 ) {
-				throw initialize_error("can't get time");
-			}
+			time_t now = time(NULL);
+			struct tm* tmp = gmtime(&now);
+
+			std::ostringstream archive_base_dir;
+			archive_base_dir << m_archive_dir;
+
+			archive_base_dir << '/' << tmp->tm_year + 1900;
+			mkdir(archive_base_dir.str().c_str(), 0755);
+
+			archive_base_dir << '/'
+				<< std::setw(2) << std::setfill('0') << tmp->tm_mon;
+			mkdir(archive_base_dir.str().c_str(), 0755);
+
+			archive_base_dir << '/'
+				<< std::setw(2) << std::setfill('0') << tmp->tm_mday;
+			mkdir(archive_base_dir.str().c_str(), 0755);
+
+			archive_base_dir << '/';
 
 			std::ostringstream record_info_path;
-			record_info_path << m_archive_dir;
-			record_info_path << static_cast<int64_t>(tv.tv_sec);
-			record_info_path << "-";
+			record_info_path << archive_base_dir.str();
 			record_info_path.write(info.session_name, info.session_name_length);
 			record_info_path << "-info";
 
@@ -358,9 +374,7 @@ int ServerIMPL::run_multiplexer(host_info_t& info)
 			record_info.close();
 
 			std::ostringstream record_path;
-			record_path << m_archive_dir;
-			record_path << static_cast<int64_t>(tv.tv_sec);
-			record_path << "-";
+			record_path << archive_base_dir.str();
 			record_path.write(info.session_name, info.session_name_length);
 
 			record = new std::ofstream( record_path.str().c_str() );

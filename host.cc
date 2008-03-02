@@ -17,6 +17,11 @@ namespace Partty {
 
 // FIXME Serverとのコネクションが切断したら再接続する？
 
+reverce_telnetd::reverce_telnetd() :
+		emtelnet(this)
+{
+}
+
 Host::Host(config_t& config) :
 		impl( new HostIMPL(config) ) {}
 

@@ -40,6 +40,7 @@ GateIMPL::GateIMPL(Gate::config_t& config) :
 		socket(config.listen_socket),
 		m_session_banner(config.session_banner),
 		m_password_banner(config.password_banner),
+		m_parent_pid(getpid()),
 		m_end(0)
 {
 	gate_dir_len = strlen(config.gate_dir);
@@ -59,6 +60,16 @@ GateIMPL::~GateIMPL() {}
 int Gate::run(void) { return impl->run(); }
 int GateIMPL::run(void)
 {
+	/*
+	{  // SIGCHLD handler
+		struct sigaction act_child;
+		act_child.sa_handler = sigchld;
+		sigemptyset(&act_child.sa_mask);
+		act_child.sa_flags = SA_NOCLDSTOP | SA_RESTART;
+		sigaction(SIGCHLD, &act_child, NULL);
+	}
+	*/
+
 	pid_t pid;
 	int status;
 	unsigned int numchild = 0;
@@ -159,6 +170,10 @@ std::cerr << gate_path << std::endl;
 	close(guest);
 	return E_SUCCESS;
 }
+
+
+void Gate::signal_end(void) { impl->signal_end(); }
+void GateIMPL::signal_end(void) { m_end = 1; }
 
 
 // telnetdを経由してバッファを書き込む

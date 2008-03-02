@@ -19,6 +19,7 @@ private:
 #ifdef PARTTY_RAW_GATE_FLASH_CROSS_DOMAIN_SUPPORT
 	std::string m_flash_cross_domain_policy;
 #endif
+	pid_t m_parent_pid;
 	sig_atomic_t m_end;
 private:
 	RawGateIMPL();
