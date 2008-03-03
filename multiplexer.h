@@ -66,6 +66,13 @@ void filt_telnetd::get_obuffer(buffer_t* out) {
 }
 
 
+class sender_telnetd : public emtelnet {
+public:
+	sender_telnetd();
+private:
+	static void pass_through_handler(char cmd, bool sw, emtelnet& base) {}
+};
+
 
 class MultiplexerIMPL {
 public:
@@ -90,6 +97,8 @@ private:
 	char shared_buffer[SHARED_BUFFER_SIZE];
 
 	session_info_t m_info;
+
+	sender_telnetd m_host_telnet;
 
 	std::ostream* m_capture_stream;
 	Captty::Recorder *m_recorder;

@@ -5,14 +5,12 @@
 
 namespace Partty {
 
-/*
 class reverce_telnetd : public emtelnet {
 public:
 	reverce_telnetd();
 private:
 	static void pass_through_handler(char cmd, bool sw, emtelnet& base) {}
 };
-*/
 
 class HostIMPL {
 public:

@@ -20,7 +20,9 @@ namespace Partty {
 reverce_telnetd::reverce_telnetd() :
 		emtelnet(this)
 {
+	// TODO
 }
+
 
 Host::Host(config_t& config) :
 		impl( new HostIMPL(config) ) {}
@@ -191,9 +193,21 @@ int HostIMPL::io_server(int fd, short event)
 	} else if( len == 0 ) { throw io_end_error("server connection closed"); }
 	// ロック中ならServerからの入力は捨てる
 	if( m_locking ) { return 0; }
+	// Telnetフィルタ
+	m_telnet.recv(shared_buffer, len);
 	// ブロックしながらシェルに書き込む
-	if( continued_blocking_write_all(sh, shared_buffer, len) != (size_t)len ){
-		throw io_error("pty is broken");
+	if( m_telnet.ilength ) {
+		if( continued_blocking_write_all(sh, m_telnet.ibuffer, m_telnet.ilength) != m_telnet.ilength ) {
+			throw io_error("pty is broken");
+		}
+		m_telnet.ilength = 0;
+	}
+	// フィルタ返信
+	if( m_telnet.olength ) {
+		if( continued_blocking_write_all(server, m_telnet.obuffer, m_telnet.olength) != m_telnet.olength ) {
+			throw io_error("server connection is broken");
+		}
+		m_telnet.olength = 0;
 	}
 	return 0;
 }
@@ -212,10 +226,13 @@ int HostIMPL::io_shell(int fd, short event)
 	if( write_all(STDOUT_FILENO, shared_buffer, len) != (size_t)len ) {
 		throw io_error("stdoutput is broken");
 	}
+	// Telnetフィルタ
+	m_telnet.send(shared_buffer, len);
 	// ブロックしながらServerに書き込む
-	if( continued_blocking_write_all(server, shared_buffer, len) != (size_t)len ) {
+	if( continued_blocking_write_all(server, m_telnet.obuffer, m_telnet.olength) != m_telnet.olength ) {
 		throw io_error("server connection is broken");
 	}
+	m_telnet.olength = 0;
 	// 標準出力の転送が終わるまで待つ
 	// （転送スピードを超過して書き込むと端末が壊れるため）
 	tcdrain(STDOUT_FILENO);

@@ -43,6 +43,12 @@ filt_telnetd::filt_telnetd() : emtelnet((void*)this)
 }
 
 
+sender_telnetd::sender_telnetd() : emtelnet((void*)this)
+{
+	// TODO
+}
+
+
 Multiplexer::Multiplexer(config_t& config) :
 	impl(new MultiplexerIMPL(config)) {}
 
@@ -89,7 +95,16 @@ MultiplexerIMPL::MultiplexerIMPL(Multiplexer::config_t& config) :
 		}
 	}
 	if( exist ) { delimiter = 255; }
-	setprocname("partty-session%c %s%c%s", delimiter, m_info.session_name, delimiter, m_info.message);
+
+	char session_op;
+	if(m_info.writable_password_length == 0) {
+		session_op = 'o';  // opened
+	} else if(m_info.readonly_password_length == 0) {
+		session_op = 'd';  // displayed
+	} else {
+		session_op = 'r';  // restricted
+	}
+	setprocname("partty-session(%c)%c %s%c%s", session_op, delimiter, m_info.session_name, delimiter, m_info.message);
 }
 
 
@@ -208,24 +223,36 @@ int MultiplexerIMPL::io_host(int fd, short event)
 		return -1;
 	}
 	// len > 0
+	// Telnetフィルタ
+	m_host_telnet.recv(shared_buffer, len);
+	// フィルタ返信
+	if( !m_host_telnet.olength ) {
+		if( continued_blocking_write_all(host, m_host_telnet.obuffer, m_host_telnet.olength) != m_host_telnet.olength ) {
+			throw io_error("host socket is broken");
+		}
+		m_host_telnet.olength = 0;
+	}
+	if( !m_host_telnet.ilength ) { return 0; }
 	// 録画
 	if( m_capture_stream ) {
-		m_recorder->write(shared_buffer, len);
+		m_recorder->write(m_host_telnet.ibuffer, m_host_telnet.ilength);
 	}
 	// ゲストにwrite
-	if( num_guest == 0 ) { return 0; }
-	int n = 0;
-	int to = num_guest;  // forの中でnum_guestが変動するので、ここで保存しておく
-	for(int fd = 0; fd < INT_MAX; ++fd) {
-		if( guest_set.test(fd) ) {
-			// send_to_guestはすべてのデータを書き込めないかもしれない
-			// すべて書き込めなければファイルディスクリプタをEV_WRITEで監視し、
-			// io_guestで書き込む
-			send_to_guest(fd, shared_buffer, len);  // ここでremove_guest()が実行されるかもしれない
-			++n;
-			if( n >= to ) { break; }
+	if( num_guest > 0 ) {
+		int n = 0;
+		int to = num_guest;  // forの中でnum_guestが変動するので、ここで保存しておく
+		for(int fd = 0; fd < INT_MAX; ++fd) {
+			if( guest_set.test(fd) ) {
+				// send_to_guestはすべてのデータを書き込めないかもしれない
+				// すべて書き込めなければファイルディスクリプタをEV_WRITEで監視し、
+				// io_guestで書き込む
+				send_to_guest(fd, m_host_telnet.ibuffer, m_host_telnet.ilength);  // ここでremove_guest()が実行されるかもしれない
+				++n;
+				if( n >= to ) { break; }
+			}
 		}
 	}
+	m_host_telnet.ilength = 0;
 	return 0;
 }
 
