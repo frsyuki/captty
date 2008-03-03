@@ -17,10 +17,24 @@ namespace Partty {
 
 // FIXME Serverとのコネクションが切断したら再接続する？
 
-reverce_telnetd::reverce_telnetd() :
+receiver_telnetd::receiver_telnetd() :
 		emtelnet(this)
 {
-	// TODO
+	// use these options
+	set_my_option_handler( emtelnet::OPT_SGA,
+			receiver_telnetd::pass_through_handler );
+	set_my_option_handler( emtelnet::OPT_BINARY,
+			receiver_telnetd::pass_through_handler );
+	set_my_option_handler( emtelnet::OPT_NAWS,
+			receiver_telnetd::pass_through_handler );
+
+	// supported partner options
+	set_partner_option_handler( emtelnet::OPT_SGA,
+			receiver_telnetd::pass_through_handler );
+	set_partner_option_handler( emtelnet::OPT_BINARY,
+			receiver_telnetd::pass_through_handler );
+
+	// skip useless negotiation
 }
 
 
@@ -167,12 +181,18 @@ int HostIMPL::io_stdin(int fd, short event)
 	if( continued_blocking_write_all(sh, shared_buffer, len) != (size_t)len ){
 		throw io_error("pty is broken");
 	}
-	// 標準入力のウィンドウサイズが変更されたら子仮想端末にも反映する
+	// 標準入力のウィンドウサイズが変更されたら、
+	// 子仮想端末に反映し、サーバーにも転送する
 	struct winsize next;
 	get_window_size(fd, &next);
 	if( winsz.ws_row != next.ws_row || winsz.ws_col != next.ws_col ) {
 		set_window_size(sh, &next);
 		winsz = next;
+		unsigned char sbbuf[4];
+		*((short*)sbbuf) = htons(next.ws_col);
+		*((short*)(sbbuf+2)) = htons(next.ws_row);
+		m_telnet.send_sb(emtelnet::OPT_NAWS, sbbuf, sizeof(sbbuf));
+		// XXX ウィンドウサイズは後で転送
 	}
 	// lock_codeが含まれていたらm_lockingをトグルする
 	for(const char *p=shared_buffer, *p_end=p+len; p != p_end; ++p) {

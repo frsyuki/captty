@@ -353,13 +353,15 @@ void emtelnet::istate_DONT(byte c)
 	if( m_do_waiting.test(c) ) {
 		// will is sent and receive dont
 		// I can't use the option
-		m_do_waiting.reset(c);
+		if( m_my_option_handler[(size_t)c] ) {
+			m_my_option_handler[(size_t)c](c, false, *this);
+		}
 	} else {
 		// the partner wants not to use the option
 		// the partner can't use the option
 		// reply dont
-		if( m_partner_option_handler[(size_t)c] ) {
-			m_partner_option_handler[(size_t)c](c, false, *this);
+		if( m_my_option_handler[(size_t)c] ) {
+			m_my_option_handler[(size_t)c](c, false, *this);
 		}
 		owrite3(IAC, WONT, c);
 	}

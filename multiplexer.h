@@ -25,8 +25,12 @@ public:
 	inline bool is_iempty(void) { return ilength == 0; }
 	inline void get_ibuffer(buffer_t* in);
 	inline void get_obuffer(buffer_t* out);
+public:
+	void send_ws(const char* sbbuf, size_t sz4);
 private:
 	static void pass_through_handler(char cmd, bool sw, emtelnet& base) {}
+	static void enable_ws_handler(char cmd, bool sw, emtelnet& base);
+	bool m_enable_ws;
 };
 
 void filt_telnetd::send(const void* buf, size_t len, buffer_t* out)
@@ -71,6 +75,22 @@ public:
 	sender_telnetd();
 private:
 	static void pass_through_handler(char cmd, bool sw, emtelnet& base) {}
+	static void window_size_handler(char cmd, const char* msg, size_t len, emtelnet& self);
+public:
+	void ws_change(short cols, short rows) {
+		m_cols = cols;
+		m_rows = rows;
+		m_ws_changed = true;
+	}
+	bool ws_changed(void) const { return m_ws_changed; }
+	short get_cols(void) const { return m_cols; }
+	short get_rows(void) const { return m_rows; }
+	void ws_flush(void) { m_ws_changed = false; }
+	bool ws_initialized(void) const { return (m_cols != 0 && m_rows != 0); }
+private:
+	short m_cols;
+	short m_rows;
+	bool m_ws_changed;
 };
 
 

@@ -17,7 +17,9 @@ namespace Partty {
 
 // FIXME perror -> ログ
 
-filt_telnetd::filt_telnetd() : emtelnet((void*)this)
+filt_telnetd::filt_telnetd() :
+		emtelnet((void*)this),
+		m_enable_ws(true)  // XXX デフォルトtrue
 {
 	// use these options
 	set_my_option_handler( emtelnet::OPT_SGA,
@@ -26,6 +28,8 @@ filt_telnetd::filt_telnetd() : emtelnet((void*)this)
 			filt_telnetd::pass_through_handler );
 	set_my_option_handler( emtelnet::OPT_BINARY,
 			filt_telnetd::pass_through_handler );
+	set_my_option_handler( emtelnet::OPT_NAWS,
+			filt_telnetd::enable_ws_handler );
 
 	// supported partner options
 	set_partner_option_handler( emtelnet::OPT_BINARY,
@@ -40,12 +44,53 @@ filt_telnetd::filt_telnetd() : emtelnet((void*)this)
 	// enable multibyte characters
 	send_will(emtelnet::OPT_BINARY);
 	send_do(emtelnet::OPT_BINARY);
+
+	// window size
+	send_will(emtelnet::OPT_NAWS);
+}
+
+void filt_telnetd::send_ws(const char* sbbuf, size_t sz4)
+{
+	if(m_enable_ws) {
+		send_sb(emtelnet::OPT_NAWS, sbbuf, sz4);
+	}
+}
+
+void filt_telnetd::enable_ws_handler(char cmd, bool sw, emtelnet& base)
+{
+	static_cast<filt_telnetd&>(base).m_enable_ws = sw;
 }
 
 
-sender_telnetd::sender_telnetd() : emtelnet((void*)this)
+sender_telnetd::sender_telnetd() :
+		emtelnet((void*)this),
+		m_cols(0), m_rows(0), m_ws_changed(false)
 {
-	// TODO
+	// use these options
+	set_my_option_handler( emtelnet::OPT_SGA,
+			sender_telnetd::pass_through_handler );
+	set_my_option_handler( emtelnet::OPT_BINARY,
+			sender_telnetd::pass_through_handler );
+
+	// supported partner options
+	set_partner_option_handler( emtelnet::OPT_SGA,
+			sender_telnetd::pass_through_handler );
+	set_partner_option_handler( emtelnet::OPT_BINARY,
+			sender_telnetd::pass_through_handler );
+	set_partner_option_handler( emtelnet::OPT_NAWS,
+			sender_telnetd::pass_through_handler );
+
+	set_sb_handler(OPT_NAWS, sender_telnetd::window_size_handler);
+
+	// skip useless negotiation
+}
+
+void sender_telnetd::window_size_handler(char cmd, const char* msg, size_t len, emtelnet& self)
+{
+	if(len != 4) { return; }
+	short cols = ntohs(*((short*)msg));
+	short rows = ntohs(*((short*)(msg+2)));
+	static_cast<sender_telnetd&>(self).ws_change(cols, rows);
 }
 
 
@@ -207,6 +252,13 @@ read(gate, trash, sizeof(trash));  // FIXME データがあった場合は捨て
 	// 書き込み待ちバッファにSERVER_WELCOME_MESSAGEを加える
 	guest_set.data(guest).send(SERVER_WELCOME_MESSAGE, strlen(SERVER_WELCOME_MESSAGE), NULL);
 	num_guest++;
+	// 初期ウィンドウサイズを設定
+	if( m_host_telnet.ws_initialized() ) {
+		char sbbuf[4];
+		*((short*)sbbuf) = htons(m_host_telnet.get_rows());
+		*((short*)(sbbuf+2)) = htons(m_host_telnet.get_cols());
+		guest_set.data(guest).send_ws(sbbuf, sizeof(sbbuf));
+	}
 	return 0;
 }
 
@@ -231,6 +283,26 @@ int MultiplexerIMPL::io_host(int fd, short event)
 			throw io_error("host socket is broken");
 		}
 		m_host_telnet.olength = 0;
+	}
+	// 画面サイズ
+	if( m_host_telnet.ws_changed() ) {
+		m_recorder->set_window_size(
+				m_host_telnet.get_rows(),
+				m_host_telnet.get_cols()
+				);
+		if( num_guest > 0 ) {
+			char sbbuf[4];
+			*((short*)sbbuf) = htons(m_host_telnet.get_rows());
+			*((short*)(sbbuf+2)) = htons(m_host_telnet.get_cols());
+			int n = 0;
+			for(int fd = 0; fd < INT_MAX; ++fd) {
+				if( guest_set.test(fd) ) {
+					guest_set.data(fd).send_ws(sbbuf, sizeof(sbbuf));
+					++n;
+					if( n >= num_guest ) { break; }
+				}
+			}
+		}
 	}
 	if( !m_host_telnet.ilength ) { return 0; }
 	// 録画

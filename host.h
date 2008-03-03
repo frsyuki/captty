@@ -5,9 +5,9 @@
 
 namespace Partty {
 
-class reverce_telnetd : public emtelnet {
+class receiver_telnetd : public emtelnet {
 public:
-	reverce_telnetd();
+	receiver_telnetd();
 private:
 	static void pass_through_handler(char cmd, bool sw, emtelnet& base) {}
 };
@@ -38,7 +38,7 @@ private:
 	mpdispatch mpdp;
 	static const size_t SHARED_BUFFER_SIZE = 32 * 1024;
 	char shared_buffer[SHARED_BUFFER_SIZE];
-	reverce_telnetd m_telnet;
+	receiver_telnetd m_telnet;
 private:
 	struct winsize winsz;
 	static int get_window_size(int fd, struct winsize* ws);
