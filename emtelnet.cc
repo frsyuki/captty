@@ -40,7 +40,7 @@ void emtelnet::send(const void* buf, size_t len)
 			// CR is not sent but LF comes
 			// send currnt buffer + CRLF, rebuffer
 			owrite(from, p - from);
-			owrite(CR);
+			owrite1(CR);
 			// LF will be sent next
 			from = p;
 		} else if( m_ostate_cr ) {
@@ -51,7 +51,7 @@ void emtelnet::send(const void* buf, size_t len)
 				// CR is sent but LF doesn't come
 				// send current buffer, send LF, rebbuffer
 				owrite(from, p - from);
-				owrite(LF);
+				owrite1(LF);
 				from = p;
 				if( *p != CR ) {
 					// leave m_ostate_cr flag true if *p == CR
@@ -61,7 +61,7 @@ void emtelnet::send(const void* buf, size_t len)
 		} else if( *p == IAC ) {
 			// ensure that IAC is never send alone but IAC IAC
 			owrite(from, p - from);
-			owrite(IAC);
+			owrite1(IAC);
 			from = p;
 		} else if( *p == CR ) {
 			m_ostate_cr = true;
@@ -70,7 +70,7 @@ void emtelnet::send(const void* buf, size_t len)
 		if( *p == IAC ) {
 			// ensure that IAC is never send alone but IAC IAC
 			owrite(from, p - from);
-			owrite(IAC);
+			owrite1(IAC);
 			from = p;
 		}
 #endif
@@ -98,35 +98,49 @@ void emtelnet::recv(const void* buf, size_t len)
 
 void emtelnet::send_will(byte cmd)
 {
-	owrite(IAC, WILL, cmd);
+	owrite3(IAC, WILL, cmd);
 	m_do_waiting.set(cmd);
 }
 
 void emtelnet::send_wont(byte cmd)
 {
-	owrite(IAC, WONT, cmd);
+	owrite3(IAC, WONT, cmd);
 	m_do_waiting.set(cmd);
 }
 
 void emtelnet::send_do(byte cmd)
 {
-	owrite(IAC, DO, cmd);
+	owrite3(IAC, DO, cmd);
 	m_will_waiting.set(cmd);
 }
 
 void emtelnet::send_dont(byte cmd)
 {
-	owrite(IAC, DONT, cmd);
+	owrite3(IAC, DONT, cmd);
 	m_will_waiting.set(cmd);
 }
 
-void emtelnet::owrite(byte c)
+void emtelnet::send_sb(byte cmd, const void* msg, size_t len)
 {
-	orealloc(1);
-	obuffer[olength++] = c;
+	owrite3(IAC, SB, cmd);
+	owrite((const byte*)msg, len);
+	owrite2(IAC, SE);
 }
 
-void emtelnet::owrite(byte c1, byte c2, byte c3)
+void emtelnet::owrite1(byte c1)
+{
+	orealloc(1);
+	obuffer[olength++] = c1;
+}
+
+void emtelnet::owrite2(byte c1, byte c2)
+{
+	orealloc(2);
+	obuffer[olength++] = c1;
+	obuffer[olength++] = c2;
+}
+
+void emtelnet::owrite3(byte c1, byte c2, byte c3)
 {
 	orealloc(3);
 	obuffer[olength++] = c1;
@@ -134,7 +148,7 @@ void emtelnet::owrite(byte c1, byte c2, byte c3)
 	obuffer[olength++] = c3;
 }
 
-void emtelnet::owrite(byte c1, byte c2, byte c3, byte c4)
+void emtelnet::owrite4(byte c1, byte c2, byte c3, byte c4)
 {
 	orealloc(4);
 	obuffer[olength++] = c1;
@@ -277,11 +291,11 @@ void emtelnet::istate_WILL(byte c)
 			// the partner can use the option
 			// reply DO
 			m_partner_option_handler[(size_t)c](c, true, *this);
-			owrite(IAC, DO, c);
+			owrite3(IAC, DO, c);
 		} else {
 			// the option is not acceptable
 			// reply DONT
-			owrite(IAC, DONT, c);
+			owrite3(IAC, DONT, c);
 		}
 	}
 	m_istate = NULL;
@@ -301,7 +315,7 @@ void emtelnet::istate_WONT(byte c)
 		if( m_my_option_handler[(size_t)c] ) {
 			m_my_option_handler[(size_t)c](c, false, *this);
 		}
-		owrite(IAC, WONT, c);
+		owrite3(IAC, WONT, c);
 	}
 	m_istate = NULL;
 }
@@ -323,11 +337,11 @@ void emtelnet::istate_DO(byte c)
 			// I can use the option
 			// reply will
 			m_my_option_handler[(size_t)c](c, true, *this);
-			owrite(IAC, WILL, c);
+			owrite3(IAC, WILL, c);
 		} else {
 			// I don't support the option
 			// reply wont
-			owrite(IAC, WONT, c);
+			owrite3(IAC, WONT, c);
 		}
 	}
 	m_istate = NULL;
@@ -347,7 +361,7 @@ void emtelnet::istate_DONT(byte c)
 		if( m_partner_option_handler[(size_t)c] ) {
 			m_partner_option_handler[(size_t)c](c, false, *this);
 		}
-		owrite(IAC, WONT, c);
+		owrite3(IAC, WONT, c);
 	}
 	m_istate = NULL;
 }

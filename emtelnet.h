@@ -23,7 +23,7 @@ public:
 	void send_wont(byte cmd);
 	void send_do(byte cmd);
 	void send_dont(byte cmd);
-	void send_sb(byte cmd, const void* msg, size_t len);  // FIXME not implemented
+	void send_sb(byte cmd, const void* msg, size_t len);
 public:
 	typedef void (*my_option_handler_t)(char cmd, bool sw, emtelnet& self);
 	typedef void (*partner_option_handler_t)(char cmd, bool sw, emtelnet& self);
@@ -74,9 +74,10 @@ private:
 	void istate_SB_MSG(byte c);
 	void istate_SB_MSG_IAC(byte c);
 private:
-	inline void owrite(byte c);
-	inline void owrite(byte c1, byte c2, byte c3);
-	inline void owrite(byte c1, byte c2, byte c3, byte c4);
+	inline void owrite1(byte c);
+	inline void owrite2(byte c1, byte c2);
+	inline void owrite3(byte c1, byte c2, byte c3);
+	inline void owrite4(byte c1, byte c2, byte c3, byte c4);
 	inline void owrite(const byte* s, size_t len);
 	inline void orealloc(size_t reqlen);
 	inline void iwrite(byte c);
