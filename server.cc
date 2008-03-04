@@ -346,7 +346,8 @@ int ServerIMPL::run_multiplexer(host_info_t& info)
 			std::ostringstream archive_base_dir;
 			archive_base_dir << m_archive_dir;
 
-			archive_base_dir << '/' << tmp->tm_year + 1900;
+			archive_base_dir << '/'
+				<< std::setw(4) << std::setfill('0') << (tmp->tm_year + 1900);
 			mkdir(archive_base_dir.str().c_str(), 0755);
 
 			archive_base_dir << '/'
@@ -357,7 +358,10 @@ int ServerIMPL::run_multiplexer(host_info_t& info)
 				<< std::setw(2) << std::setfill('0') << tmp->tm_mday;
 			mkdir(archive_base_dir.str().c_str(), 0755);
 
-			archive_base_dir << '/';
+			archive_base_dir << '/'
+				<< std::setw(2) << tmp->tm_hour << '-'
+				<< std::setw(2) << tmp->tm_min  << '-'
+				<< std::setw(2) << tmp->tm_sec  << '-';
 
 			std::ostringstream record_info_path;
 			record_info_path << archive_base_dir.str();
