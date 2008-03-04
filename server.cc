@@ -308,6 +308,35 @@ int ServerIMPL::sync_reply(int fd, uint16_t code, const char* message, size_t me
 	return 0;
 }
 
+
+namespace {
+void write_info(std::ostream& stream, host_info_t& info)
+{
+	stream << "session-name: ";
+	stream.write(info.session_name, info.session_name_length) << "\n";
+
+	stream << "message: ";
+	stream.write(info.message, info.message_length) << "\n";
+
+	stream << "view-only-password: ";
+	stream.write(info.readonly_password, info.readonly_password_length) << "\n";
+
+	stream << "operation-password: ";
+	stream.write(info.readonly_password, info.readonly_password_length) << "\n";
+}
+
+class scoped_ostream {
+public:
+	scoped_ostream() : m_stream(NULL) {}
+	~scoped_ostream() { delete m_stream; }
+	void set(std::ostream* stream) { m_stream = stream; }
+	std::ostream* ptr(void) { return m_stream; }
+private:
+	std::ostream* m_stream;
+};
+
+}  // noname namespace
+
 int ServerIMPL::run_multiplexer(host_info_t& info)
 {
 	memcpy(gate_path + gate_dir_len, info.session_name, info.session_name_length);
@@ -338,74 +367,42 @@ int ServerIMPL::run_multiplexer(host_info_t& info)
 
 	int ret;
 	try {
-		std::ofstream* record = NULL;
+		scoped_ostream record;
 		{
-			time_t now = time(NULL);
-			struct tm* tmp = gmtime(&now);
-
-			std::ostringstream archive_base_dir;
-			archive_base_dir << m_archive_dir;
-
-			archive_base_dir << '/'
-				<< std::setw(4) << std::setfill('0') << (tmp->tm_year + 1900);
-			mkdir(archive_base_dir.str().c_str(), 0755);
-
-			archive_base_dir << '/'
-				<< std::setw(2) << std::setfill('0') << tmp->tm_mon;
-			mkdir(archive_base_dir.str().c_str(), 0755);
-
-			archive_base_dir << '/'
-				<< std::setw(2) << std::setfill('0') << tmp->tm_mday;
-			mkdir(archive_base_dir.str().c_str(), 0755);
-
-			archive_base_dir << '/'
-				<< std::setw(2) << tmp->tm_hour << '-'
-				<< std::setw(2) << tmp->tm_min  << '-'
-				<< std::setw(2) << tmp->tm_sec  << '-';
+			std::string archive_base_dir;
+			create_archive_base_dir(archive_base_dir);
 
 			std::ostringstream record_info_path;
-			record_info_path << archive_base_dir.str();
+			record_info_path << archive_base_dir;
 			record_info_path.write(info.session_name, info.session_name_length);
 			record_info_path << "-info";
 
 			std::ofstream record_info(record_info_path.str().c_str());
-			record_info << "session-name: ";
-			record_info.write(info.session_name, info.session_name_length) << "\n";
-			record_info << "view-only-password: ";
-			record_info.write(info.readonly_password, info.readonly_password_length) << "\n";
-			record_info << "operation-password: ";
-			record_info.write(info.readonly_password, info.readonly_password_length) << "\n";
-			record_info.close();
+			write_info(record_info, info);
 
 			std::ostringstream record_path;
-			record_path << archive_base_dir.str();
+			record_path << archive_base_dir;
 			record_path.write(info.session_name, info.session_name_length);
 
-			record = new std::ofstream( record_path.str().c_str() );
+			record.set( new std::ofstream(record_path.str().c_str()) );
 		}
 
-		try {
-			session_info_ref_t ref(info);
-			Multiplexer::config_t config(info.fd, gate, ref);
-			config.capture_stream = record;
+		session_info_ref_t ref(info);
+		Multiplexer::config_t config(info.fd, gate, ref);
+		config.capture_stream = record.ptr();
 
-			Multiplexer multiplexer(config);
-			if( sync_reply(fd, negotiation_reply::SUCCESS, "ok") < 0 ) {
-				throw io_error("sync reply failed");
-			}
-	
-			std::cerr << "session ";
-			std::cerr.write(info.session_name, info.session_name_length);
-			std::cerr << " : ";
-			std::cerr.write(info.message, info.message_length);
-			std::cerr << std::endl;
-	
-			ret = multiplexer.run();
-		} catch (...) {
-			delete record;
-			throw;
+		Multiplexer multiplexer(config);
+		if( sync_reply(fd, negotiation_reply::SUCCESS, "ok") < 0 ) {
+			throw io_error("sync reply failed");
 		}
-		delete record;
+
+		std::cerr << "session ";
+		std::cerr.write(info.session_name, info.session_name_length);
+		std::cerr << " : ";
+		std::cerr.write(info.message, info.message_length);
+		std::cerr << std::endl;
+
+		ret = multiplexer.run();
 
 	} catch (initialize_error& e) {
 		perror(e.what());
@@ -420,6 +417,35 @@ int ServerIMPL::run_multiplexer(host_info_t& info)
 	}
 	unlink(gate_path);
 	return ret;
+}
+
+
+void ServerIMPL::create_archive_base_dir(std::string& result)
+{
+	time_t now = time(NULL);
+	struct tm* tmp = gmtime(&now);
+
+	std::ostringstream archive_base_dir;
+	archive_base_dir << m_archive_dir;
+
+	archive_base_dir << '/'
+		<< std::setw(4) << std::setfill('0') << (tmp->tm_year + 1900);
+	mkdir(archive_base_dir.str().c_str(), 0755);
+
+	archive_base_dir << '/'
+		<< std::setw(2) << std::setfill('0') << (tmp->tm_mon + 1);
+	mkdir(archive_base_dir.str().c_str(), 0755);
+
+	archive_base_dir << '/'
+		<< std::setw(2) << std::setfill('0') << tmp->tm_mday;
+	mkdir(archive_base_dir.str().c_str(), 0755);
+
+	archive_base_dir << '/'
+		<< std::setw(2) << tmp->tm_hour << '-'
+		<< std::setw(2) << tmp->tm_min  << '-'
+		<< std::setw(2) << tmp->tm_sec  << '-';
+
+	result = archive_base_dir.str();
 }
 
 

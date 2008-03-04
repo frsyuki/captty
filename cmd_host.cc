@@ -23,7 +23,7 @@ char* getusername(void) {
 void usage(void)
 {
 	std::cout
-		<< "partty "<<VERSION<<"\n"
+		<< "\n"
 		<< "* Partty Host (create new session)\n"
 		<< "   [connect to server]$ partty-host  [options]  <server name>  # use default port ["<<Partty::SERVER_DEFAULT_PORT<<"]\n"
 		<< "   [connect to server]$ partty-host  [options]  <server name>:<port number>\n"

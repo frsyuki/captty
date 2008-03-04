@@ -1,4 +1,5 @@
 #include <mp/io.h>
+#include <signal.h>
 #include "partty.h"
 
 namespace Partty {
@@ -72,6 +73,7 @@ private:
 	int sync_reply(int fd, uint16_t code, const char* message);
 	int sync_reply(int fd, uint16_t code, const char* message, size_t message_length);
 	int run_multiplexer(host_info_t& info);
+	void create_archive_base_dir(std::string& result);
 };
 
 
