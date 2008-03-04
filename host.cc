@@ -37,6 +37,13 @@ receiver_telnetd::receiver_telnetd() :
 	// skip useless negotiation
 }
 
+void receiver_telnetd::send_ws(unsigned short row, unsigned short col)
+{
+	unsigned char sbbuf[4];
+	*((short*)sbbuf) = htons(col);
+	*((short*)(sbbuf+2)) = htons(row);
+	send_sb(emtelnet::OPT_NAWS, sbbuf, sizeof(sbbuf));
+}
 
 Host::Host(config_t& config) :
 		impl( new HostIMPL(config) ) {}
@@ -150,6 +157,8 @@ int HostIMPL::run(char* cmd[])
 
 	// 端末のウィンドウサイズを取得しておく
 	get_window_size(STDIN_FILENO, &winsz);
+	// 初期端末サイズを送信
+	m_telnet.send_ws(winsz.ws_row, winsz.ws_col);
 
 	std::cout << SESSION_START_MESSAGE << std::flush;
 
@@ -188,10 +197,7 @@ int HostIMPL::io_stdin(int fd, short event)
 	if( winsz.ws_row != next.ws_row || winsz.ws_col != next.ws_col ) {
 		set_window_size(sh, &next);
 		winsz = next;
-		unsigned char sbbuf[4];
-		*((short*)sbbuf) = htons(next.ws_col);
-		*((short*)(sbbuf+2)) = htons(next.ws_row);
-		m_telnet.send_sb(emtelnet::OPT_NAWS, sbbuf, sizeof(sbbuf));
+		m_telnet.send_ws(next.ws_row, next.ws_col);
 		// XXX ウィンドウサイズは後で転送
 	}
 	// lock_codeが含まれていたらm_lockingをトグルする

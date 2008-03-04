@@ -8,6 +8,7 @@ namespace Partty {
 class receiver_telnetd : public emtelnet {
 public:
 	receiver_telnetd();
+	void send_ws(unsigned short row, unsigned short col);
 private:
 	static void pass_through_handler(char cmd, bool sw, emtelnet& base) {}
 };
