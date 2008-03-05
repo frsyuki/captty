@@ -45,8 +45,6 @@ public:
 	inline void oclear(void);
 	inline void iconsumed(size_t len);
 	inline void oconsumed(size_t len);
-	inline bool is_oempty(void) { return olength == 0; }
-	inline bool is_iempty(void) { return ilength == 0; }
 	inline void get_ibuffer(buffer_t* in);
 	inline void get_obuffer(buffer_t* out);
 public:
@@ -56,6 +54,8 @@ private:
 	static void enable_ws_handler(char cmd, bool sw, emtelnet& base);
 	sender_telnetd& m_host_telnet;
 	bool m_enable_ws;
+public:
+	bool write_waiting;
 };
 
 void filt_telnetd::send(const void* buf, size_t len, buffer_t* out)

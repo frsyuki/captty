@@ -21,7 +21,8 @@ namespace Partty {
 filt_telnetd::filt_telnetd(sender_telnetd& host_telnet) :
 		emtelnet((void*)this),
 		m_host_telnet(host_telnet),
-		m_enable_ws(false)
+		m_enable_ws(false),
+		write_waiting(false)
 {
 	// use these options
 	set_my_option_handler( emtelnet::OPT_SGA,
@@ -258,7 +259,7 @@ read(gate, trash, sizeof(trash));  // FIXME データがあった場合は捨て
 	// ゲストを監視対象に追加
 	if( fcntl(guest, F_SETFL, O_NONBLOCK) < 0 ||
 			mpev.add(guest, mp::EV_READ | mp::EV_WRITE) < 0 ) {
-			// イベント待ちは readable or writable から始める
+			// イベント待ちは書き込み待ち状態から始める
 		perror("guest connection failed");
 		close(guest);
 		return 0;
@@ -266,6 +267,8 @@ read(gate, trash, sizeof(trash));  // FIXME データがあった場合は捨て
 	guest_set.set<sender_telnetd&>(guest, m_host_telnet);
 	// 書き込み待ちバッファにSERVER_WELCOME_MESSAGEを加える
 	guest_set.data(guest).send(SERVER_WELCOME_MESSAGE, strlen(SERVER_WELCOME_MESSAGE), NULL);
+	// 書き込み待ちから始める
+	guest_set.data(guest).write_waiting = true;
 	num_guest++;
 	return 0;
 }
@@ -300,8 +303,8 @@ int MultiplexerIMPL::io_host(int fd, short event)
 				);
 		if( num_guest > 0 ) {
 			char sbbuf[4];
-			*((short*)sbbuf) = htons(m_host_telnet.get_rows());
-			*((short*)(sbbuf+2)) = htons(m_host_telnet.get_cols());
+			*((short*)sbbuf) = htons(m_host_telnet.get_cols());
+			*((short*)(sbbuf+2)) = htons(m_host_telnet.get_rows());
 			int n = 0;
 			for(int fd = 0; fd < INT_MAX; ++fd) {
 				if( guest_set.test(fd) ) {
@@ -311,6 +314,7 @@ int MultiplexerIMPL::io_host(int fd, short event)
 				}
 			}
 		}
+		m_host_telnet.ws_flush();
 	}
 	if( !m_host_telnet.ilength ) { return 0; }
 	// 録画
@@ -353,25 +357,26 @@ int MultiplexerIMPL::io_guest(int fd, short event, bool writable)
 			perror("read from guest ends");
 			remove_guest(fd);
 			return 0;
-		} else if( writable ) {
-			// 書き込み可能guest -> host
+		} else {
+			// guest -> host
 			filt_telnetd::buffer_t ibuf;
 			if( recv_filter(fd, shared_buffer, len, &ibuf) < 0 ) {
 				// 切断されたゲストからのバッファは捨てる
 				return 0;
 			}
-			// FIXME Hostが切断されたのかエラーが発生したのか区別できない
-			if( continued_blocking_write_all(host, ibuf.buf, ibuf.len) != ibuf.len ) {
-				throw io_error("host socket is broken");
+			if( writable ) {
+				// FIXME Hostが切断されたのかエラーが発生したのか区別できない
+				if( continued_blocking_write_all(host, ibuf.buf, ibuf.len) != ibuf.len ) {
+					throw io_error("host socket is broken");
+				}
 			}
+			// read-only guestからの入力はそのまま捨てる
 		}
-		// read-only guestからの入力はそのまま捨てる
 	}
 	if( event & mp::EV_WRITE ) {
 		// 書き込み待ちバッファ -> ゲスト
 		filt_telnetd& srv( guest_set.data(fd) );
 		ssize_t len = write(fd, srv.obuffer, srv.olength);
-		//if( srv.olength == 0 ) { return 0; }  // olengthは0の可能性がある？
 		if( len < 0 ) {
 			if( errno == EAGAIN || errno == EINTR ) { return 0; }
 			else {
@@ -395,6 +400,7 @@ int MultiplexerIMPL::io_guest(int fd, short event, bool writable)
 					remove_guest(fd);
 					return 0;
 				}
+				srv.write_waiting = false;
 				srv.oclear();
 			}
 		}
@@ -405,11 +411,10 @@ int MultiplexerIMPL::io_guest(int fd, short event, bool writable)
 int MultiplexerIMPL::recv_filter(int fd, const void* buf, size_t len, filt_telnetd::buffer_t* ibuf)
 {
 	filt_telnetd& srv( guest_set.data(fd) );
-	bool may_writable = srv.is_oempty();
 	srv.recv(buf, len, ibuf, NULL);  // recvしたときにもobufが発生する
 	srv.iclear();   // 呼び出し側はibufを確実に使い切らないといけない
-	if( may_writable ) {
-		// 書き込み待ちバッファが空だったので書き込めるかもしれない
+	if( !srv.write_waiting ) {
+		// 書き込み待ち状態ではないので今すぐ書き込めるかもしれない
 		if( guest_try_write(fd, srv) < 0 ) {
 			remove_guest(fd, srv);
 			return -1;
@@ -421,10 +426,9 @@ int MultiplexerIMPL::recv_filter(int fd, const void* buf, size_t len, filt_telne
 int MultiplexerIMPL::send_to_guest(int fd, const void* buf, size_t len)
 {
 	filt_telnetd& srv( guest_set.data(fd) );
-	bool may_writable = srv.is_oempty();
 	srv.send(buf, len, NULL);
-	if( may_writable ) {
-		// 書き込み待ちバッファが空だったので書き込めるかもしれない
+	if( !srv.write_waiting ) {
+		// 書き込み待ち状態ではないので今すぐ書き込めるかもしれない
 		if( guest_try_write(fd, srv) < 0 ) {
 			remove_guest(fd, srv);
 			return -1;
@@ -437,9 +441,7 @@ int MultiplexerIMPL::guest_try_write(int fd, filt_telnetd& srv)
 {
 	// 現在の書き込み待ちバッファにあるバッファを書き込んでみて、
 	// 全部書き込めたらそのまま、書き込めなかったら書き込み待ちにする
-	// 書き込みバッファが無かった状態から書き込み待ちバッファがある状態に
-	// 遷移したときにのみ、この関数を呼べる
-	if( srv.olength <= 0 ) { return 0; }
+	if( srv.olength == 0 || srv.write_waiting ) { return 0; }
 	ssize_t wlen = write(fd, srv.obuffer, srv.olength);
 	if( wlen < 0 && errno != EAGAIN && errno != EINTR ) {
 		perror("write to guest failed");
@@ -456,6 +458,7 @@ int MultiplexerIMPL::guest_try_write(int fd, filt_telnetd& srv)
 			perror("mpev.modify");
 			return -1;
 		}
+		srv.write_waiting = true;
 	} else {
 		// 全部書き込めた
 		srv.oclear();
@@ -471,7 +474,7 @@ void MultiplexerIMPL::remove_guest(int fd)
 
 void MultiplexerIMPL::remove_guest(int fd, filt_telnetd& srv)
 {
-	mpev.remove(fd, mp::EV_READ | (srv.is_oempty() ? 0 : mp::EV_WRITE));
+	mpev.remove(fd, mp::EV_READ | (srv.write_waiting ? mp::EV_READ : 0));
 	guest_set.reset(fd);
 	num_guest--;
 	close(fd);
