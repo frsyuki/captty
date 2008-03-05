@@ -18,9 +18,10 @@ namespace Partty {
 
 // FIXME perror -> ログ
 
-filt_telnetd::filt_telnetd() :
+filt_telnetd::filt_telnetd(sender_telnetd& host_telnet) :
 		emtelnet((void*)this),
-		m_enable_ws(true)  // XXX デフォルトtrue
+		m_host_telnet(host_telnet),
+		m_enable_ws(false)
 {
 	// use these options
 	set_my_option_handler( emtelnet::OPT_SGA,
@@ -59,7 +60,20 @@ void filt_telnetd::send_ws(const char* sbbuf, size_t sz4)
 
 void filt_telnetd::enable_ws_handler(char cmd, bool sw, emtelnet& base)
 {
-	static_cast<filt_telnetd&>(base).m_enable_ws = sw;
+	filt_telnetd& self( static_cast<filt_telnetd&>(base) );
+	self.m_enable_ws = sw;
+	if(sw) {
+		sender_telnetd& host( self.m_host_telnet );
+		if( host.ws_initialized() ) {
+			// 初期ウィンドウサイズを設定
+			if( host.ws_initialized() ) {
+				char sbbuf[4];
+				*((short*)sbbuf) = htons(host.get_rows());
+				*((short*)(sbbuf+2)) = htons(host.get_cols());
+				self.send_ws(sbbuf, sizeof(sbbuf));
+			}
+		}
+	}
 }
 
 
@@ -249,17 +263,10 @@ read(gate, trash, sizeof(trash));  // FIXME データがあった場合は捨て
 		close(guest);
 		return 0;
 	}
-	guest_set.set(guest);
+	guest_set.set<sender_telnetd&>(guest, m_host_telnet);
 	// 書き込み待ちバッファにSERVER_WELCOME_MESSAGEを加える
 	guest_set.data(guest).send(SERVER_WELCOME_MESSAGE, strlen(SERVER_WELCOME_MESSAGE), NULL);
 	num_guest++;
-	// 初期ウィンドウサイズを設定
-	if( m_host_telnet.ws_initialized() ) {
-		char sbbuf[4];
-		*((short*)sbbuf) = htons(m_host_telnet.get_rows());
-		*((short*)(sbbuf+2)) = htons(m_host_telnet.get_cols());
-		guest_set.data(guest).send_ws(sbbuf, sizeof(sbbuf));
-	}
 	return 0;
 }
 

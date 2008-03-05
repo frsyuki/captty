@@ -7,6 +7,30 @@
 
 namespace Partty {
 
+class sender_telnetd : public emtelnet {
+public:
+	sender_telnetd();
+private:
+	static void pass_through_handler(char cmd, bool sw, emtelnet& base) {}
+	static void window_size_handler(char cmd, const char* msg, size_t len, emtelnet& self);
+public:
+	void ws_change(short cols, short rows) {
+		m_cols = cols;
+		m_rows = rows;
+		m_ws_changed = true;
+	}
+	bool ws_changed(void) const { return m_ws_changed; }
+	short get_cols(void) const { return m_cols; }
+	short get_rows(void) const { return m_rows; }
+	void ws_flush(void) { m_ws_changed = false; }
+	bool ws_initialized(void) const { return (m_cols != 0 && m_rows != 0); }
+private:
+	short m_cols;
+	short m_rows;
+	bool m_ws_changed;
+};
+
+
 class filt_telnetd : public emtelnet {
 public:
 	struct buffer_t {
@@ -14,7 +38,7 @@ public:
 		size_t len;
 	};
 public:
-	filt_telnetd();
+	explicit filt_telnetd(sender_telnetd& host_telnet);
 	inline void send(const void* buf, size_t len, buffer_t* out);
 	inline void recv(const void* buf, size_t len, buffer_t* in, buffer_t* out);
 	inline void iclear(void);
@@ -30,6 +54,7 @@ public:
 private:
 	static void pass_through_handler(char cmd, bool sw, emtelnet& base) {}
 	static void enable_ws_handler(char cmd, bool sw, emtelnet& base);
+	sender_telnetd& m_host_telnet;
 	bool m_enable_ws;
 };
 
@@ -68,30 +93,6 @@ void filt_telnetd::get_obuffer(buffer_t* out) {
 	out->buf = obuffer;
 	out->len = olength;
 }
-
-
-class sender_telnetd : public emtelnet {
-public:
-	sender_telnetd();
-private:
-	static void pass_through_handler(char cmd, bool sw, emtelnet& base) {}
-	static void window_size_handler(char cmd, const char* msg, size_t len, emtelnet& self);
-public:
-	void ws_change(short cols, short rows) {
-		m_cols = cols;
-		m_rows = rows;
-		m_ws_changed = true;
-	}
-	bool ws_changed(void) const { return m_ws_changed; }
-	short get_cols(void) const { return m_cols; }
-	short get_rows(void) const { return m_rows; }
-	void ws_flush(void) { m_ws_changed = false; }
-	bool ws_initialized(void) const { return (m_cols != 0 && m_rows != 0); }
-private:
-	short m_cols;
-	short m_rows;
-	bool m_ws_changed;
-};
 
 
 class MultiplexerIMPL {

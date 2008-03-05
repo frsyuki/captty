@@ -123,7 +123,21 @@ void emtelnet::send_dont(byte cmd)
 void emtelnet::send_sb(byte cmd, const void* msg, size_t len)
 {
 	owrite3(IAC, SB, cmd);
-	owrite((const byte*)msg, len);
+	// don't send IAC alone
+#ifdef EMTELNET_CONVERT_CRLF_LF
+	// don't convert CRLF to LF
+	const byte* p = (const byte*)msg;
+	const byte* endp = p + len;
+	for(; p != endp; ++p) {
+		if( *p == IAC ) {
+			owrite2(IAC, IAC);
+		} else {
+			owrite1(*p);
+		}
+	}
+#else
+	send(msg, len);
+#endif
 	owrite2(IAC, SE);
 }
 

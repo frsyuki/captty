@@ -218,7 +218,7 @@ int HostIMPL::io_server(int fd, short event)
 		else { throw io_error("server connection is broken"); }
 	} else if( len == 0 ) { throw io_end_error("server connection closed"); }
 	// ロック中ならServerからの入力は捨てる
-	if( m_locking ) { return 0; }
+	if( m_locking ) { return 0; }  // XXX Telnetの返答も無視している
 	// Telnetフィルタ
 	m_telnet.recv(shared_buffer, len);
 	// ブロックしながらシェルに書き込む
