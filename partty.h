@@ -64,7 +64,7 @@ namespace Partty {
 static const unsigned short SERVER_DEFAULT_PORT   = 2750;
 static const unsigned short GATE_DEFAULT_PORT     = 7777;
 
-static const size_t MAX_SESSION_NAME_LENGTH = 128;
+static const size_t MAX_SESSION_NAME_LENGTH = 256;
 static const size_t MIN_SESSION_NAME_LENGTH = 3;
 static const size_t MAX_PASSWORD_LENGTH     = 128;
 static const size_t MAX_MESSAGE_LENGTH    = 128;
@@ -75,7 +75,7 @@ static const char* const SESSION_START_MESSAGE = PARTTY_SESSION_START_MESSAGE;
 static const char* const SESSION_END_MESSAGE = PARTTY_SESSION_END_MESSAGE;
 
 
-static const uint8_t PROTOCOL_VERSION = 1;
+static const uint8_t PROTOCOL_VERSION = 2;
 
 static const char   NEGOTIATION_MAGIC_STRING[] = "Partty!";
 static const size_t NEGOTIATION_MAGIC_STRING_LENGTH = 7;
