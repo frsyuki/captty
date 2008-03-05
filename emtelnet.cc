@@ -326,8 +326,8 @@ void emtelnet::istate_WONT(byte c)
 		// I am required not to use the option
 		// I can't use the option
 		// reply wont
-		if( m_my_option_handler[(size_t)c] ) {
-			m_my_option_handler[(size_t)c](c, false, *this);
+		if( m_partner_option_handler[(size_t)c] ) {
+			m_partner_option_handler[(size_t)c](c, false, *this);
 		}
 		owrite3(IAC, WONT, c);
 	}
@@ -367,6 +367,7 @@ void emtelnet::istate_DONT(byte c)
 	if( m_do_waiting.test(c) ) {
 		// will is sent and receive dont
 		// I can't use the option
+		m_do_waiting.reset(c);
 		if( m_my_option_handler[(size_t)c] ) {
 			m_my_option_handler[(size_t)c](c, false, *this);
 		}
@@ -385,8 +386,6 @@ void emtelnet::istate_DONT(byte c)
 void emtelnet::istate_SB(byte c)
 {
 	//fprintf(stderr, "sb %u\n", c);
-	m_sb_buffer[0] = c;
-	m_sb_length = 1;
 	sb_reset(c);
 	m_istate = &emtelnet::istate_SB_MSG;
 }

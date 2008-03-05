@@ -68,8 +68,8 @@ void filt_telnetd::enable_ws_handler(char cmd, bool sw, emtelnet& base)
 			// 初期ウィンドウサイズを設定
 			if( host.ws_initialized() ) {
 				char sbbuf[4];
-				*((short*)sbbuf) = htons(host.get_rows());
-				*((short*)(sbbuf+2)) = htons(host.get_cols());
+				*((short*)sbbuf) = htons(host.get_cols());
+				*((short*)(sbbuf+2)) = htons(host.get_rows());
 				self.send_ws(sbbuf, sizeof(sbbuf));
 			}
 		}
