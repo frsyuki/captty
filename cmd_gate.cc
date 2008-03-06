@@ -19,9 +19,24 @@ void usage(void)
 		<< std::endl;
 }
 
+struct usage_action {
+	unsigned int operator() (int argc, char* argv[]) {
+		usage();
+		exit(0);
+	}
+};
+
+#ifndef DISABLE_IPV6
 int listen_socket(struct sockaddr_storage& saddr)
+#else
+int listen_socket(struct sockaddr_in& saddr)
+#endif
 {
+#ifndef DISABLE_IPV6
 	int ssock = socket(saddr.ss_family, SOCK_STREAM, 0);
+#else
+	int ssock = socket(PF_INET, SOCK_STREAM, 0);
+#endif
 	if( ssock < 0 ) {
 		perror("socket");
 		return -1;
@@ -31,9 +46,13 @@ int listen_socket(struct sockaddr_storage& saddr)
 		perror("setsockopt");
 		return -1;
 	}
+#ifndef DISABLE_IPV6
 	socklen_t saddr_len = (saddr.ss_family == AF_INET) ?
 		sizeof(struct sockaddr_in) :
 		sizeof(struct sockaddr_in6);
+#else
+	socklen_t saddr_len = sizeof(struct sockaddr_in);
+#endif
 	if( bind(ssock, (struct sockaddr*)&saddr, saddr_len) < 0 ) {
 		perror("can't bind the address");
 		return -1;
@@ -47,7 +66,11 @@ int listen_socket(struct sockaddr_storage& saddr)
 
 int main(int argc, char* argv[])
 {
+#ifndef DISABLE_IPV6
 	struct sockaddr_storage saddr;
+#else
+	struct sockaddr_in saddr;
+#endif
 	bool use_raw = false;
 	std::string gate_dir;
 	bool gate_dir_set;
@@ -57,6 +80,7 @@ int main(int argc, char* argv[])
 		--argc;  ++argv;  // skip argv[0]
 		kz.on("-r", "--raw",  Accept::Boolean(use_raw));
 		kz.on("-g", "--gate", Accept::String(gate_dir), gate_dir_set);
+		kz.on("-h", "--help", Accept::Action(usage_action()));
 		kz.break_parse(argc, argv);
 		if( argc == 0 ) {
 			Convert::AnyAddress(saddr, Partty::GATE_DEFAULT_PORT);

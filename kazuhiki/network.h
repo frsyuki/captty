@@ -6,7 +6,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#ifndef DISABLE_IFADDRS
 #include <ifaddrs.h>
+#endif
 #include "kazuhiki/parser.h"
 #include "kazuhiki/basic.h"
 #include "kazuhiki/network_impl.h"

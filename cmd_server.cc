@@ -24,9 +24,24 @@ void usage(void)
 		<< std::endl;
 }
 
+struct usage_action {
+	unsigned int operator() (int argc, char* argv[]) {
+		usage();
+		exit(0);
+	}
+};
+
+#ifndef DISABLE_IPV6
 int listen_socket(struct sockaddr_storage& saddr)
+#else
+int listen_socket(struct sockaddr_in& saddr)
+#endif
 {
+#ifndef DISABLE_IPV6
 	int ssock = socket(saddr.ss_family, SOCK_STREAM, 0);
+#else
+	int ssock = socket(PF_INET, SOCK_STREAM, 0);
+#endif
 	if( ssock < 0 ) {
 		perror("socket");
 		return -1;
@@ -36,9 +51,13 @@ int listen_socket(struct sockaddr_storage& saddr)
 		perror("setsockopt");
 		return -1;
 	}
+#ifndef DISABLE_IPV6
 	socklen_t saddr_len = (saddr.ss_family == AF_INET) ?
 		sizeof(struct sockaddr_in) :
 		sizeof(struct sockaddr_in6);
+#else
+	socklen_t saddr_len = sizeof(struct sockaddr_in);
+#endif
 	if( bind(ssock, (struct sockaddr*)&saddr, saddr_len) < 0 ) {
 		perror("can't bind the address");
 		return -1;
@@ -55,7 +74,11 @@ int main(int argc, char* argv[], char* envp[])
 	// Server needs initprocname
 	Partty::initprocname(argc, argv, envp);
 
+#ifndef DISABLE_IPV6
 	struct sockaddr_storage saddr;
+#else
+	struct sockaddr_in saddr;
+#endif
 	std::string gate_dir;
 	std::string archive_dir;
 	bool gate_dir_set;
@@ -64,8 +87,9 @@ int main(int argc, char* argv[], char* envp[])
 		using namespace Kazuhiki;
 		--argc;  ++argv;  // skip argv[0]
 		Parser kz;
-		kz.on("-g", "--gate", Accept::String(gate_dir), gate_dir_set);
+		kz.on("-g", "--gate",    Accept::String(gate_dir), gate_dir_set);
 		kz.on("-a", "--archive", Accept::String(archive_dir), archive_dir_set);
+		kz.on("-h", "--help",    Accept::Action(usage_action()));
 		kz.break_parse(argc, argv);
 		if( argc == 0 ) {
 			Convert::AnyAddress(saddr, Partty::SERVER_DEFAULT_PORT);

@@ -44,6 +44,16 @@ private:
 	T& data;
 };
 
+template <typename F>
+struct Action : Acceptable {
+	Action(F f) : function(f) {}
+	unsigned int operator() (int argc, char* argv[]) {
+		return function(argc, argv);
+	}
+private:
+	F function;
+};
+
 }  // namespace IMPL
 }  // namespace Kazuhiki
 

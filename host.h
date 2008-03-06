@@ -1,5 +1,6 @@
 #include <mp/dispatch.h>
 #include <sys/ioctl.h>
+#include <termios.h>
 #include "partty.h"
 #include "emtelnet.h"
 

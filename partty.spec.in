@@ -5,7 +5,7 @@ Release:	0
 License:	GPL
 Group:		Applications/Terminal
 Packager:	FURUHASHI Sadayuki <fr _at_ syuki.skr.jp>
-URL:		http://partty.net/
+URL:		http://www.partty.org/
 Source:		%{name}-%{version}.tar.gz
 BuildRoot:	%{_tmppath}/%{name}-%{version}-root
 

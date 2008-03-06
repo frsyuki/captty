@@ -40,6 +40,13 @@ void usage(void)
 		<< std::endl;
 }
 
+struct usage_action {
+	unsigned int operator() (int argc, char* argv[]) {
+		usage();
+		exit(0);
+	}
+};
+
 }
 
 int main(int argc, char* argv[])
@@ -54,7 +61,11 @@ int main(int argc, char* argv[])
 	bool writable_password_set;
 	bool readonly_password_set;
 	bool lock_char_set;
+#ifndef DISABLE_IPV6
 	struct sockaddr_storage saddr;
+#else
+	struct sockaddr_in saddr;
+#endif
 	try {
 		using namespace Kazuhiki;
 		Parser kz;
@@ -64,6 +75,7 @@ int main(int argc, char* argv[])
 		kz.on("-w", "--password",  Accept::String(writable_password), writable_password_set);
 		kz.on("-r", "--view-only", Accept::String(readonly_password), readonly_password_set);
 		kz.on("-c", "--lock",      Accept::Character(lock_char), lock_char_set);
+		kz.on("-h", "--help",      Accept::Action(usage_action()));
 		kz.break_parse(argc, argv);  // parse!
 
 		if( argc < 1 ) {
@@ -132,14 +144,22 @@ int main(int argc, char* argv[])
 	}
 
 	// ソケットをlisten
+#ifndef DISABLE_IPV6
 	int ssock = socket(saddr.ss_family, SOCK_STREAM, 0);
+#else
+	int ssock = socket(PF_INET, SOCK_STREAM, 0);
+#endif
 	if( ssock < 0 ) {
 		perror("socket");
 		return 1;
 	}
+#ifndef DISABLE_IPV6
 	socklen_t saddr_len = (saddr.ss_family == AF_INET) ?
 		sizeof(struct sockaddr_in) :
 		sizeof(struct sockaddr_in6);
+#else
+	socklen_t saddr_len = sizeof(struct sockaddr_in);
+#endif
 	if( connect(ssock, (struct sockaddr*)&saddr, saddr_len) < 0 ) {
 		perror("can't to connect to server");
 		return 1;

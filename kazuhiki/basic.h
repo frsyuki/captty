@@ -54,7 +54,10 @@ namespace Accept {
 	};
 	
 	template <typename T>
-	struct IMPL::NumericIMPL<T> Numeric(T& n) { return IMPL::NumericIMPL<T>(n); }
+	IMPL::NumericIMPL<T> Numeric(T& n) { return IMPL::NumericIMPL<T>(n); }
+
+	template <typename F>
+	IMPL::Action<F> Action(F function) { return IMPL::Action<F>(function); }
 }
 
 

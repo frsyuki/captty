@@ -45,7 +45,6 @@ pid_t ptyshell::fork(char* cmd[])
 		// child
 		::close(m_master);
 		setsid();
-		ioctl(slave, TIOCSCTTY, 0);
 		dup2(slave, 0);
 		dup2(slave, 1);
 		dup2(slave, 2);

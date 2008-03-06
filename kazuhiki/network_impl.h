@@ -10,6 +10,7 @@ bool ConvertHostNameIMPL(const char* arg, Address& addr, bool resolve, int famil
 	Address v;
 	memset(&v, 0, sizeof(v));
 	if( !resolve ) {
+#ifndef DISABLE_IPV6
 		if( family == AF_UNSPEC ) {
 			if( inet_pton(AF_INET,  arg, &((struct sockaddr_in* )&v)->sin_addr) > 0 ){
 				((struct sockaddr_in*)&v)->sin_family = AF_INET;
@@ -35,7 +36,11 @@ bool ConvertHostNameIMPL(const char* arg, Address& addr, bool resolve, int famil
 				return false;
 			}
 		}
+#else
+		return inet_aton(arg, &v.sin_addr);
+#endif
 	} else {
+#ifndef DISABLE_GETADDRINFO
 		struct addrinfo hints;
 		memset(&hints, 0, sizeof(hints));
 		hints.ai_family = family;
@@ -49,6 +54,11 @@ bool ConvertHostNameIMPL(const char* arg, Address& addr, bool resolve, int famil
 		struct addrinfo* rp(res);  // 最初の一つを使う
 		memcpy(&v, rp->ai_addr, rp->ai_addrlen);
 		freeaddrinfo(res);
+#else
+		struct hostent* ent = gethostbyname(arg);
+		if(!ent) { return false; }
+		memcpy(&v, ent->h_addr_list[0], ent->h_length); // 最初の一つを使う
+#endif
 	}
 	addr = v;
 	((struct sockaddr_in*)&addr)->sin_port = htons(port);
@@ -58,12 +68,14 @@ bool ConvertHostNameIMPL(const char* arg, Address& addr, bool resolve, int famil
 bool ConvertHostName(const char* arg, struct sockaddr_in& addr, unsigned short port, bool resolve = true) {
 	return ConvertHostNameIMPL(arg, addr, resolve, AF_INET, 0, port);
 }
+#ifndef DISABLE_IPV6
 bool ConvertHostName(const char* arg, struct sockaddr_in6& addr, unsigned short port, bool resolve = true) {
 	return ConvertHostNameIMPL(arg, addr, resolve, AF_INET6, 0, port);
 }
 bool ConvertHostName(const char* arg, struct sockaddr_storage& addr, unsigned short port, bool resolve = true) {
 	return ConvertHostNameIMPL(arg, addr, resolve, AF_UNSPEC, AI_ADDRCONFIG, port);
 }
+#endif
 
 
 bool ConvertAnyAddress(struct sockaddr_in& addr, unsigned short port) {
@@ -73,6 +85,7 @@ bool ConvertAnyAddress(struct sockaddr_in& addr, unsigned short port) {
 	addr.sin_addr.s_addr = INADDR_ANY;
 	return true;
 }
+#ifndef DISABLE_IPV6
 bool ConvertAnyAddress(struct sockaddr_in6& addr, unsigned short port) {
 	memset(&addr, 0, sizeof(addr));
 	addr.sin6_family = AF_INET6;
@@ -87,8 +100,10 @@ bool ConvertAnyAddress(struct sockaddr_storage& addr, unsigned short port) {
 	((struct sockaddr_in6*)&addr)->sin6_addr = in6addr_any;
 	return true;
 }
+#endif
 
 
+#ifndef DISABLE_IFADDRS
 template <typename Address>
 bool NetworkInterfaceIMPL(const char* str, Address& addr, int family, unsigned short port) {
 	struct ifaddrs* ifap;
@@ -111,12 +126,15 @@ bool NetworkInterfaceIMPL(const char* str, Address& addr, int family, unsigned s
 bool NetworkInterface(const char* str, struct sockaddr_in& addr, unsigned short port) {
 	return NetworkInterfaceIMPL(str, addr, AF_INET, port);
 }
+#ifndef DISABLE_IPV6
 bool NetworkInterface(const char* str, struct sockaddr_in6& addr, unsigned short port) {
 	return NetworkInterfaceIMPL(str, addr, AF_INET6, port);
 }
 bool NetworkInterface(const char* str, struct sockaddr_storage& addr, unsigned short port) {
 	return NetworkInterfaceIMPL(str, addr, AF_UNSPEC, port);
 }
+#endif
+#endif
 
 
 
@@ -200,7 +218,11 @@ private:
 					return true;
 				} else {
 					// 1
+#ifndef DISABLE_IFADDRS
 					return resolve_netif(host.c_str(), port.c_str());
+#else
+					return false;
+#endif
 				}
 			}
 		} else {
@@ -226,6 +248,7 @@ private:
 		}
 		return IMPL::ConvertHostName(addr, raddr, p, do_resolve);
 	}
+#ifndef DISABLE_IFADDRS
 	bool resolve_netif(const char* netif, const char* port)
 	{
 		unsigned short p = dport;
@@ -234,6 +257,7 @@ private:
 		}
 		return IMPL::NetworkInterface(netif, raddr, p);
 	}
+#endif
 	bool resolve_any(const char* port)
 	{
 		// FIXME
