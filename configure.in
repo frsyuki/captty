@@ -1,9 +1,9 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
-AC_PREREQ(2.61)
-AC_INIT(partty, 0.2.8, fr _at_ syuki.skr.jp)
-AM_INIT_AUTOMAKE(partty, 0.2.8)
+AC_PREREQ(2.59)
+AC_INIT(partty, 0.2.9, fr _at_ syuki.skr.jp)
+AM_INIT_AUTOMAKE(partty, 0.2.9)
 AC_CONFIG_SRCDIR(partty.h)
 AC_CONFIG_HEADER(config.h)
 
@@ -20,6 +20,16 @@ if test "$have_pty_h" = 1; then
 else
 	AC_CHECK_HEADERS(util.h)
 fi
+
+AC_ARG_WITH([shell],
+	    AS_HELP_STRING([--with-shell=shell],
+			   [path to fallback shell if SHELL environment variable is not available [[/bin/sh]]]),
+	    [with_shell=$withval], [with_shell=/bin/sh])
+
+if test -z "$with_shell" ; then
+	with_shell=/bin/sh
+fi
+AC_DEFINE_UNQUOTED([FALLBACK_SHELL], ["$with_shell"], [fallback shell if SHELL environment variable is not available])
 
 # Checks for header files.
 AC_HEADER_STDC

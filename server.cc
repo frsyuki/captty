@@ -341,11 +341,6 @@ int ServerIMPL::run_multiplexer(host_info_t& info)
 {
 	memcpy(gate_path + gate_dir_len, info.session_name, info.session_name_length);
 	gate_path[gate_dir_len + info.session_name_length] = '\0';
-				std::cerr << "gate: '";
-				std::cerr.write(info.session_name, info.session_name_length);
-				std::cerr << "'" << std::endl;
-				std::cerr << "s name len: " << info.session_name_length << std::endl;
-				std::cerr << gate_path << std::endl;
 
 	int fd = info.fd;
 

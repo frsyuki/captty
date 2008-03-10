@@ -20,6 +20,8 @@ char* getusername(void) {
 	}
 }
 
+static char* fallback_shell[3];
+
 void usage(void)
 {
 	std::cout
@@ -47,10 +49,31 @@ struct usage_action {
 	}
 };
 
-}
+struct parse_end_exception {};
+struct parse_end {
+	unsigned int operator() (int argc, char* argv[]) {
+		throw parse_end_exception();
+	}
+};
+
+}  // noname namespace
 
 int main(int argc, char* argv[])
 {
+	{
+		fallback_shell[0] = getenv("SHELL");
+		if(!fallback_shell[0]) {
+#ifdef FALLBACK_SHELL
+			fallback_shell[0] = FALLBACK_SHELL;
+			fallback_shell[1] = NULL;
+#else
+			fallback_shell[0] = "/bin/sh";
+			fallback_shell[1] = "-i";
+			fallback_shell[2] = NULL;
+#endif
+		}
+	}
+
 	std::string session_name;
 	std::string message;
 	std::string writable_password;
@@ -76,7 +99,10 @@ int main(int argc, char* argv[])
 		kz.on("-r", "--view-only", Accept::String(readonly_password), readonly_password_set);
 		kz.on("-c", "--lock",      Accept::Character(lock_char), lock_char_set);
 		kz.on("-h", "--help",      Accept::Action(usage_action()));
-		kz.break_parse(argc, argv);  // parse!
+		kz.on("--", "",            Accept::Action(parse_end()));
+		try {
+			kz.break_parse(argc, argv);  // parse!
+		} catch (parse_end_exception& e) { }
 
 		if( argc < 1 ) {
 			usage();
@@ -186,7 +212,7 @@ int main(int argc, char* argv[])
 		if( argc > 0 ) {
 			return host.run(argv);
 		} else {
-			return host.run(NULL);
+			return host.run(fallback_shell);
 		}
 	} catch (Partty::partty_error& e) {
 		std::cerr << "error: " << e.what() << std::endl;
