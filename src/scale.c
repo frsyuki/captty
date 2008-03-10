@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
+#include <termios.h>
 
 struct context_t {
 	const char* chars;

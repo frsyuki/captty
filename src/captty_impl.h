@@ -24,13 +24,13 @@
 #include "config.h"
 #endif
 
+#include "captty.h"
 #include <vector>
 #include <unistd.h>
 #include <termios.h>
 #include <errno.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
-#include "captty.h"
 
 namespace Captty {
 

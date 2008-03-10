@@ -17,12 +17,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "partty.h"
+#include "emtelnet.h"
+#include "captty.h"
+#include <vector>
 #include <mp/event.h>
 #include <mp/sparse_array.h>
-#include <vector>
-#include "emtelnet.h"
-#include "partty.h"
-#include "captty.h"
 
 namespace Partty {
 

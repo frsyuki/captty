@@ -17,9 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <mp/io.h>
-#include <signal.h>
 #include "partty.h"
+#include <signal.h>
+#include <mp/io.h>
 
 namespace Partty {
 

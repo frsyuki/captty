@@ -17,10 +17,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "server.h"
-#include <mp/functional.h>
-#include <mp/ios/rw.h>
-#include <mp/ios/net.h>
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -31,8 +27,12 @@
 #include <fstream>
 #include <sstream>
 #include <iomanip>
+#include "server.h"
 #include "uniext.h"
 #include "fdtransport.h"
+#include <mp/functional.h>
+#include <mp/ios/rw.h>
+#include <mp/ios/net.h>
 
 namespace Partty {
 

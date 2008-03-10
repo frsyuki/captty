@@ -17,11 +17,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <mp/dispatch.h>
-#include <sys/ioctl.h>
-#include <termios.h>
 #include "partty.h"
 #include "emtelnet.h"
+#include <sys/ioctl.h>
+#include <termios.h>
+#include <mp/dispatch.h>
 
 namespace Partty {
 
