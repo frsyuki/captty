@@ -1,8 +1,73 @@
 Partty!
 -------
-CUI terminal sharing system.
+Terminal sharing system.
+
+
+*Install
+
+  1. Checkout and build mpio library
+    $ svn co http://svn.coderepos.org/share/lang/c/mpio/trunk/mp src/mp
+    $ make -C src/mp
+
+    Note: ruby is required.
+
+
+  2. Run ./configure && make && make install
+    $ ./configure
+    $ make
+    $ make install
+
+    Note: g++ >= 4.1 is required.
+
+    Note: following files will be installed:
+      $PREFIX/bin/partty-host
+      $PREFIX/bin/partty-server
+      $PREFIX/bin/partty-gate
+      $PREFIX/bin/partty-scale
+      $PREFIX/bin/captty
+
+
+*Usage
+
+  1. Run partty-server and partty-gate. They will listen on
+     2750/tcp (accept partty-host) and 7777/tcp (accept telnet guest)
+     by default.
+     See `partty-server --help' or `partty-gate --help' for more
+     details.
+
+    $ partty-server &
+    $ partty-gate &
+
+
+  2. Start terminal sharing using partty-host with the host name
+     where partty-gate and partty-server are running.
+
+    $ partty-host localhost
+
+    Note: When partty-host starts, $PARTTY_SESSION environment
+          variable is set. Following ~/.bashrc setting is useful
+          to tell whether the terminal is being shared or not.
+
+          # Change prompt when sharing the terminal.
+          if [ -n "$PARTTY_SESSION" ]; then
+                  PS1="[\u@$PARTTY_SESSION! \W]$ "
+          fi
+
+
+  3. Use telnet to join the shared terminal session. The port number
+     is 7777.
+
+    $ telnet localhost 7777
+
+    Note: Don't join the session on the partty-host that hosting the
+          session.  It will casuse inifnite loop.
 
 
 --
-FURUHASHI Sadayuki
-<fr _at_ syuki.skr.jp>
+Copyright (C) 2007-2008 FURUHASHI Sadayuki All rights reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+

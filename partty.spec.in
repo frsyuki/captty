@@ -12,14 +12,6 @@ BuildRoot:	%{_tmppath}/%{name}-%{version}-root
 %description
 Partty! is a program that allows you to share the terminal with others.
 
-#%package devel
-#Summary:	development libraries of %{name}
-#Group:		Development/Libraries
-#Requires:	%{name} = %{version}
-#
-#%description devel
-#development libraries of %{name}
-
 %prep
 %setup -q
 %configure
@@ -41,7 +33,3 @@ make
 #%{_libdir}/*.a
 %doc AUTHORS COPYING ChangeLog INSTALL NEWS README
 
-#%files devel
-#%{_includedir}/
-#%{_libdir}/*.la
-#%{_libdir}/*.so
