@@ -41,7 +41,7 @@
 
 #ifndef PARTTY_GATE_SESSION_BANNER
 #define PARTTY_GATE_SESSION_BANNER \
-	"Welcome to Partty hogehoge!\r\n\r\nSession name: "
+	"Welcome to Partty!\r\n\r\nSession name: "
 #endif
 
 #ifndef PARTTY_GATE_PASSWORD_BANNER
@@ -80,13 +80,13 @@
 namespace Partty {
 
 
-static const unsigned short SERVER_DEFAULT_PORT   = 2750;
-static const unsigned short GATE_DEFAULT_PORT     = 7777;
+static const unsigned short SERVER_DEFAULT_PORT = 2750;
+static const unsigned short GATE_DEFAULT_PORT   = 7777;
 
 static const size_t MAX_SESSION_NAME_LENGTH = 256;
 static const size_t MIN_SESSION_NAME_LENGTH = 3;
 static const size_t MAX_PASSWORD_LENGTH     = 128;
-static const size_t MAX_MESSAGE_LENGTH    = 128;
+static const size_t MAX_MESSAGE_LENGTH      = 128;
 
 
 static const char* const SERVER_WELCOME_MESSAGE = PARTTY_SERVER_WELCOME_MESSAGE;

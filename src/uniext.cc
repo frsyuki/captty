@@ -55,7 +55,7 @@ void setprocname(const char *fmt, ...)
 	va_end(va);
 
 	for(char* p = &static_argv[0][strlen(static_argv[0])]; p < argv_end; ++p) {
-		*p = NULL;
+		*p = 0;
 	}
 }
 
