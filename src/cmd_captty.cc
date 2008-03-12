@@ -1,7 +1,7 @@
 /*
  * This file is part of Captty.
  *
- * Copyright (C) 2008-2009 FURUHASHI Sadayuki
+ * Copyright (C) 2007-2008 FURUHASHI Sadayuki, TOMATSURI Kaname
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,8 +22,8 @@
 void usage()
 {
 	std::cout
+		<< "Captty "<<"0.3.0"<<"\n"
 		<< "\n"
-		<< "*Captty (record and play tty session)\n"
 		<< "  [record tty]$ captty r[ecord] <file>.pty [command...]\n"
 		<< "  [replay tty]$ captty p[lay]   <file>.pty\n"
 		<< "\n"

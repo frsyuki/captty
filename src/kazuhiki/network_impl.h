@@ -81,7 +81,8 @@ bool ConvertHostNameIMPL(const char* arg, Address& addr, bool resolve, int famil
 #else
 		struct hostent* ent = gethostbyname(arg);
 		if(!ent) { return false; }
-		memcpy(&v, ent->h_addr_list[0], ent->h_length); // 最初の一つを使う
+		((struct sockaddr_in*)&v)->sin_family = AF_INET;
+		memcpy(&((struct sockaddr_in*)&v)->sin_addr, ent->h_addr_list[0], ent->h_length); // 最初の一つを使う
 #endif
 	}
 	addr = v;

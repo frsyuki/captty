@@ -1,7 +1,7 @@
 /*
  * This file is part of Partty
  *
- * Copyright (C) 2008-2009 FURUHASHI Sadayuki
+ * Copyright (C) 2007-2008 FURUHASHI Sadayuki
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -46,6 +46,20 @@ void usage(void)
 struct usage_action {
 	unsigned int operator() (int argc, char* argv[]) {
 		usage();
+		exit(0);
+	}
+};
+
+struct version_action {
+	unsigned int operator() (int argc, char* argv[]) {
+		std::cout << "partty-server " << VERSION << std::endl
+			  << "\n"
+			  << "Copyright (C) 2007-2008 FURUHASHI Sadayuki\n"
+			  << "This is free software.  You may redistribute copies of it under the terms of\n"
+			  << "the GNU General Public License <http://www.gnu.org/licenses/gpl.html>.\n"
+			  << "There is NO WARRANTY, to the extent permitted by law.\n"
+			  << "\n"
+			  << std::endl;
 		exit(0);
 	}
 };
@@ -109,6 +123,7 @@ int main(int argc, char* argv[], char* envp[])
 		kz.on("-g", "--gate",    Accept::String(gate_dir), gate_dir_set);
 		kz.on("-a", "--archive", Accept::String(archive_dir), archive_dir_set);
 		kz.on("-h", "--help",    Accept::Action(usage_action()));
+		kz.on("-V", "--version", Accept::Action(version_action()));
 		kz.break_parse(argc, argv);
 		if( argc == 0 ) {
 			Convert::AnyAddress(saddr, Partty::SERVER_DEFAULT_PORT);

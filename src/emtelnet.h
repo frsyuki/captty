@@ -1,7 +1,7 @@
 /*
  * emtelnet
  *
- * Copyright (C) 2008-2009 FURUHASHI Sadayuki
+ * Copyright (C) 2007-2008 FURUHASHI Sadayuki
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal

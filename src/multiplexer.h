@@ -1,7 +1,7 @@
 /*
  * This file is part of Partty
  *
- * Copyright (C) 2008-2009 FURUHASHI Sadayuki
+ * Copyright (C) 2007-2008 FURUHASHI Sadayuki
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
