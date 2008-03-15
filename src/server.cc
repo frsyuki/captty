@@ -261,26 +261,30 @@ int Lobby::io_fork(mpio& mp, int fd, void* payload, size_t just, size_t len)
 	next_host->writable_password_length = header->writable_password_length;
 	next_host->readonly_password_length = header->readonly_password_length;
 
+	// message
 	std::memcpy( next_host->message,
 		     payload,
 		     header->message_length);
 	next_host->message[header->message_length] = '\0';
 
+	// session name
 	std::memcpy( next_host->session_name,
 		     (char*)payload + next_host->message_length,
 		     header->session_name_length);
 	next_host->session_name[header->session_name_length] = '\0';
 
+	// writable password
 	std::memcpy( next_host->writable_password,
 		     (char*)payload + next_host->message_length
 				    + next_host->session_name_length,
 		     header->writable_password_length);
 	next_host->writable_password[header->writable_password_length] = '\0';
 
+	// readonly password
 	std::memcpy( next_host->readonly_password,
 		     (char*)payload + next_host->message_length
 				    + next_host->session_name_length
-				    + next_host->readonly_password_length,
+				    + next_host->writable_password_length,
 		     header->readonly_password_length);
 	next_host->readonly_password[header->readonly_password_length] = '\0';
 
@@ -337,10 +341,10 @@ void write_info(std::ostream& stream, host_info_t& info)
 	stream << "message: ";
 	stream.write(info.message, info.message_length) << "\n";
 
-	stream << "view-only-password: ";
-	stream.write(info.readonly_password, info.readonly_password_length) << "\n";
-
 	stream << "operation-password: ";
+	stream.write(info.writable_password, info.writable_password_length) << "\n";
+
+	stream << "view-only-password: ";
 	stream.write(info.readonly_password, info.readonly_password_length) << "\n";
 }
 
