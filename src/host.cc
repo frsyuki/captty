@@ -70,6 +70,7 @@ Host::Host(config_t& config) :
 HostIMPL::HostIMPL(Host::config_t& config) :
 	server(config.server_socket),
 	m_lock_code(config.lock_code), m_locking(false),
+	m_view_only(config.view_only),
 	m_info(config.info) {}
 
 
@@ -222,7 +223,13 @@ int HostIMPL::io_stdin(int fd, short event)
 	// lock_codeが含まれていたらm_lockingをトグルする
 	for(const char *p=shared_buffer, *p_end=p+len; p != p_end; ++p) {
 		if(*p == m_lock_code) {
-			m_locking = !m_locking;
+			if(m_lock_code) {
+				m_lock_code = false;
+				std::cout << " *unlocked* " << std::flush;
+			} else {
+				m_lock_code = true;
+				std::cout << " *locked* " << std::flush;
+			}
 		}
 	}
 	return 0;
@@ -236,8 +243,8 @@ int HostIMPL::io_server(int fd, short event)
 		if( errno == EAGAIN || errno == EINTR ) { return 0; }
 		else { throw io_error("server connection is broken"); }
 	} else if( len == 0 ) { throw io_end_error("server connection closed"); }
-	// ロック中ならServerからの入力は捨てる
-	if( m_locking ) { return 0; }  // XXX Telnetの返答も無視している
+	// view_onlyモードまたはロック中ならServerからの入力は捨てる
+	if( m_view_only || m_locking ) { return 0; }  // XXX Telnetの返答も無視している
 	// Telnetフィルタ
 	m_telnet.recv(shared_buffer, len);
 	// ブロックしながらシェルに書き込む

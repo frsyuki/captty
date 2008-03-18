@@ -294,10 +294,12 @@ public:
 		config_t(int _server_socket,
 				const session_info_ref_t& info_) :
 			lock_code(0),
+			view_only(false),
 			server_socket(_server_socket),
 			info(info_) {}
 	public:
 		int lock_code;
+		bool view_only;
 	private:
 		int server_socket;
 		const session_info_ref_t& info;

@@ -56,6 +56,7 @@ void usage(void)
 		<< "     -m <message>             message in a word ["<<getusername()<<"]\n"
 		<< "     -w <oparation password>  password to operate the session\n"
 		<< "     -r <view-only password>  password to view the session\n"
+		<< "     -k                       disable all gust operation regardless of operation password\n"
 		<< "     -c <lock character>      control key to lock guest operation (default: ']')\n"
 		<< "\n"
 		<< std::endl;
@@ -111,6 +112,7 @@ int main(int argc, char* argv[])
 	std::string message;
 	std::string writable_password;
 	std::string readonly_password;
+	bool view_only;
 	char lock_char = ']';
 	bool session_name_set;
 	bool message_set;
@@ -130,6 +132,7 @@ int main(int argc, char* argv[])
 		kz.on("-m", "--message",   Accept::String(message), message_set);
 		kz.on("-w", "--password",  Accept::String(writable_password), writable_password_set);
 		kz.on("-r", "--view-only", Accept::String(readonly_password), readonly_password_set);
+		kz.on("-k", "--locked",    Accept::Boolean(view_only));
 		kz.on("-c", "--lock",      Accept::Character(lock_char), lock_char_set);
 		kz.on("-h", "--help",      Accept::Action(usage_action()));
 		kz.on("-V", "--version",   Accept::Action(version_action()));
@@ -242,6 +245,7 @@ int main(int argc, char* argv[])
 	try {
 		Partty::Host::config_t config(ssock, info);
 		config.lock_code = lock_char - 'a' + 1;;
+		config.view_only = view_only;
 		Partty::Host host(config);
 		if( argc > 0 ) {
 			return host.run(argv);

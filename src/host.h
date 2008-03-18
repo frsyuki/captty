@@ -46,6 +46,8 @@ private:
 	char m_lock_code;
 	bool m_locking;
 
+	bool m_view_only;
+
 	session_info_t m_info;
 private:
 	HostIMPL();
