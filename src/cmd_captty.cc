@@ -18,6 +18,8 @@
  */
 
 #include "captty.h"
+#include <string.h>
+#include <stdlib.h>
 
 void usage()
 {

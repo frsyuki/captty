@@ -20,6 +20,7 @@
 #include "partty.h"
 #include "uniext.h"
 #include <kazuhiki/network.h>
+#include <stdlib.h>
 
 void usage(void)
 {

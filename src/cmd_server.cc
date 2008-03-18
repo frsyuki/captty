@@ -22,6 +22,7 @@
 #include "fdtransport.h"
 #include <kazuhiki/network.h>
 #include <string.h>
+#include <stdlib.h>
 #include <string>
 #include <limits.h>
 #include <signal.h>

@@ -2,8 +2,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.61)
-AC_INIT(partty, 0.3.0, fr _at_ syuki.skr.jp)
-AM_INIT_AUTOMAKE(partty, 0.3.0)
+AC_INIT(partty, 0.3.1, fr _at_ syuki.skr.jp)
+AM_INIT_AUTOMAKE(partty, 0.3.1)
 AC_CONFIG_SRCDIR(src/partty.h)
 AC_CONFIG_HEADER(config.h)
 
@@ -14,11 +14,12 @@ AC_PROG_CC
 # Checks for libraries.
 #AC_CHECK_LIB(z,compress,,AC_MSG_ERROR(Test for libz failed.))
 
-AC_CHECK_HEADERS(pty.h,have_pty_h=1)
+AC_CHECK_HEADERS(pty.h,have_pty_h=1)  # Mac OS X
+AC_CHECK_HEADERS(libutil.h,have_pty_h=1)  # FreeBSD
 if test "$have_pty_h" = 1; then
 	AC_CHECK_LIB(util,openpty)
 else
-	AC_CHECK_HEADERS(util.h)
+	AC_CHECK_HEADERS(util.h)  # Linux
 fi
 
 AC_ARG_WITH([shell],

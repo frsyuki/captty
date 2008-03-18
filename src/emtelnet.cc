@@ -24,6 +24,7 @@
 
 #include "emtelnet.h"
 #include <cstring>
+#include <stdlib.h>
 
 
 emtelnet::emtelnet(void* user_data) :
