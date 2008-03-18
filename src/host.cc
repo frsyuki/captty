@@ -223,11 +223,11 @@ int HostIMPL::io_stdin(int fd, short event)
 	// lock_codeが含まれていたらm_lockingをトグルする
 	for(const char *p=shared_buffer, *p_end=p+len; p != p_end; ++p) {
 		if(*p == m_lock_code) {
-			if(m_lock_code) {
-				m_lock_code = false;
+			if(m_locking) {
+				m_locking = false;
 				std::cout << " *unlocked* " << std::flush;
 			} else {
-				m_lock_code = true;
+				m_locking = true;
 				std::cout << " *locked* " << std::flush;
 			}
 		}
