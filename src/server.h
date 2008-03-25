@@ -20,6 +20,7 @@
 #include "partty.h"
 #include <signal.h>
 #include <mp/io.h>
+#include <climits>
 
 namespace Partty {
 

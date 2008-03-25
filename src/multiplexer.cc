@@ -24,7 +24,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <arpa/inet.h>
-#include <limits>
+#include <climits>
 #include "multiplexer.h"
 #include "pty_make_raw.h"
 #include "uniext.h"
