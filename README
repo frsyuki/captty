@@ -13,6 +13,7 @@ Terminal sharing system.
 
 
   2. Run ./configure && make && make install
+    $ ./autosetup.sh
     $ ./configure
     $ make
     $ make install
