@@ -113,7 +113,7 @@ int main(int argc, char* argv[])
 	std::string message;
 	std::string writable_password;
 	std::string readonly_password;
-	bool view_only;
+	bool view_only = false;
 	char lock_char = ']';
 	bool session_name_set;
 	bool message_set;
