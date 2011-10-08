@@ -1,0 +1,16 @@
+*.o
+aclocal.m4
+autom4*
+config.h.in
+configure
+NEWS
+INSTALL
+Makefile
+Makefile.in
+ac/*
+config.h
+config.log
+config.status
+stamp-h1
+.deps
+src/captty

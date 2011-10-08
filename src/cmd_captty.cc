@@ -21,23 +21,26 @@
 #include <string.h>
 #include <stdlib.h>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 void usage()
 {
 	std::cout
-		<< "Captty "<<"0.3.0"<<"\n"
+		<< "Captty " VERSION "\n"
 		<< "\n"
 		<< "  [record tty]$ captty r[ecord] <file>.pty [command...]\n"
 		<< "  [replay tty]$ captty p[lay]   <file>.pty\n"
 		<< "\n"
 		<< "  player keyboard control:\n"
-		<< "    g    rewind to start\n"
-		<< "    l    skip forward\n"
-		<< "    h    skip back\n"
-		<< "    k    speed up\n"
-		<< "    j    speed down\n"
-		<< "    =    reset speed\n"
-		<< "    ;    pause/restart\n"
-		<< "\n"
+		<< "      g    rewind to start\n"
+		<< "      l    skip forward\n"
+		<< "      h    skip back\n"
+		<< "      k    speed up\n"
+		<< "      j    speed down\n"
+		<< "      =    reset speed\n"
+		<< "      ;    pause/restart\n"
 		<< std::endl;
 }
 
