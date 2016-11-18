@@ -18,7 +18,7 @@ Checkout the repository and build:
 
 ## Usage
 
-Recording mode `captty r <file>.pty [command...]` starts a new shell or given command.
+Recording mode `captty r <file>.pty [command...]` starts a new shell or given command, and records all outputs of the tty. Exiting the shell or command stops the recording.
 
 Replay mode `captty p <file>.pty` replays the recorded tty outputs. You can use following keys to control:
 
@@ -30,3 +30,4 @@ Replay mode `captty p <file>.pty` replays the recorded tty outputs. You can use 
         =    reset speed
         ;    pause/restart
 
+Note: zsh may not work. Please use `captty r <file.pty> /bin/bash` instead.
