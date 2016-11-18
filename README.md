@@ -18,3 +18,15 @@ Checkout the repository and build:
 
 ## Usage
 
+Recording mode `captty r <file>.pty [command...]` starts a new shell or given command.
+
+Replay mode `captty p <file>.pty` replays the recorded tty outputs. You can use following keys to control:
+
+        g    rewind to start
+        l    skip forward
+        h    skip back
+        k    speed up
+        j    speed down
+        =    reset speed
+        ;    pause/restart
+
